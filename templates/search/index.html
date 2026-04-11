@@ -1,0 +1,807 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <h1 class="h5 mb-4 text-muted fw-normal">Search a reagent</h1>
+
+    <!-- ── CAS ──────────────────────────────────────────────────────────── -->
+    <div class="card mb-3 shadow-sm search-card">
+      <div class="card-body py-3">
+        <span class="section-title">CAS / EC Number</span>
+        <div class="input-group">
+          <input id="cas-input" type="text" class="form-control text-mono"
+                 placeholder="e.g. 7758-99-8 or 231-847-6" autocomplete="off" />
+          <button class="btn btn-outline-secondary" id="cas-btn" type="button">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Name ─────────────────────────────────────────────────────────── -->
+    <div class="card mb-3 shadow-sm search-card">
+      <div class="card-body py-3">
+        <span class="section-title">Compound Name</span>
+        <div class="d-flex gap-2">
+          <div class="position-relative flex-grow-1">
+            <div class="input-group">
+              <input id="name-input" type="text" class="form-control"
+                     placeholder="e.g. Copper(II) chloride" autocomplete="off" />
+              <button class="btn btn-outline-secondary" id="name-hydration-btn"
+                      data-field="name" title="Set hydration degree"
+                      data-bs-toggle="modal" data-bs-target="#hydrationModal">
+                <i class="bi bi-droplet"></i>
+              </button>
+              <button class="btn btn-outline-secondary" id="name-btn">
+                <i class="bi bi-search"></i>
+              </button>
+            </div>
+            <ul id="name-autocomplete" class="list-group position-absolute w-100"
+                style="display:none; top:100%; left:0;"></ul>
+          </div>
+        </div>
+        <small id="name-hydration-badge" class="text-primary mt-1"
+               style="display:none;"></small>
+      </div>
+    </div>
+
+    <!-- ── Formula ──────────────────────────────────────────────────────── -->
+    <div class="card mb-3 shadow-sm search-card">
+      <div class="card-body py-3">
+        <span class="section-title">Molecular Formula</span>
+        <div class="input-group">
+          <input id="formula-input" type="text" class="form-control text-mono"
+                 placeholder="e.g. CuCl2" autocomplete="off" />
+          <button class="btn btn-outline-secondary" id="formula-hydration-btn"
+                  data-field="formula" title="Set hydration degree"
+                  data-bs-toggle="modal" data-bs-target="#hydrationModal">
+            <i class="bi bi-droplet"></i>
+          </button>
+          <button class="btn btn-outline-secondary" id="formula-btn">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+        <small id="formula-hydration-badge" class="text-primary mt-1"
+               style="display:none;"></small>
+      </div>
+    </div>
+
+    <!-- ── Results ───────────────────────────────────────────────────────── -->
+    <div id="search-results" class="mt-3"></div>
+
+    <!-- ── Create Special Solution ─────────────────────────────────────── -->
+    <div class="card mb-3 shadow-sm mt-4">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="cursor:pointer;" data-bs-toggle="collapse"
+           data-bs-target="#mixtureSection" aria-expanded="false"
+           aria-controls="mixtureSection">
+        <span class="section-title mb-0">
+          <i class="bi bi-beaker me-1"></i>Create Special Solution
+        </span>
+        <i class="bi bi-chevron-down" id="mixture-chevron"></i>
+      </div>
+      <div class="collapse" id="mixtureSection">
+        <div class="card-body py-3">
+
+          <!-- Mixture message -->
+          <div id="mix-msg" class="alert py-2 small mb-3" style="display:none;"></div>
+
+          <!-- ① Metadata -->
+          <div class="row g-2 mb-3">
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">
+                Name <span class="text-danger">*</span>
+              </label>
+              <input type="text" id="mix-name" class="form-control form-control-sm"
+                     placeholder="e.g. PBS 1×, pH 7.4 buffer…" autocomplete="off" />
+            </div>
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">Description</label>
+              <textarea id="mix-description" class="form-control form-control-sm"
+                        rows="2" placeholder="Optional…"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">Prepared by</label>
+              <input type="text" id="mix-author" class="form-control form-control-sm"
+                     placeholder="Optional…" autocomplete="off" />
+            </div>
+          </div>
+
+          <!-- ② Compounds -->
+          <p class="section-title mb-2" style="font-size:0.75rem;">
+            Compounds (solutes)
+          </p>
+          <div id="mix-compounds-rows"></div>
+          <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
+                  id="mix-add-compound">
+            <i class="bi bi-plus-lg me-1"></i>Add compound
+          </button>
+
+          <!-- ③ Solvents -->
+          <p class="section-title mb-2" style="font-size:0.75rem;">Solvents</p>
+          <div id="mix-solvents-rows"></div>
+          <button type="button" class="btn btn-outline-secondary btn-sm mb-3"
+                  id="mix-add-solvent">
+            <i class="bi bi-plus-lg me-1"></i>Add solvent
+          </button>
+
+          <!-- ④ Submit -->
+          <div class="pt-1">
+            <button type="button" class="btn btn-primary btn-sm px-4"
+                    id="mix-create-btn" disabled>
+              <i class="bi bi-check2-circle me-1"></i>Create Special Solution
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /Create Special Solution card -->
+
+  </div><!-- /col -->
+</div><!-- /row -->
+
+<!-- ── Hydration Modal ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="hydrationModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">Hydration Degree</h6>
+        <button type="button" class="btn-close btn-close-sm"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-3">
+        <p class="small text-muted mb-2">
+          Number of water molecules — e.g. <code>2</code> for dihydrate,
+          <code>0.5</code> for hemihydrate.
+        </p>
+        <input id="hydration-input" type="number" step="0.25" min="0.25"
+               class="form-control form-control-sm" placeholder="e.g. 2" />
+        <div id="hydration-preview" class="mt-2 small fw-semibold text-primary"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-link text-danger"
+                id="hydration-clear">Clear</button>
+        <button type="button" class="btn btn-sm btn-primary"
+                id="hydration-confirm" data-bs-dismiss="modal">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Disambiguation Modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="disambiguateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">Multiple matches found</h6>
+        <button type="button" class="btn-close btn-close-sm"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <p class="small text-muted px-3 pt-3 mb-2">
+          The name you entered matches more than one compound.
+          Select the one you are looking for:
+        </p>
+        <div id="disambiguate-list" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SUFFIXES = {
+  0.25:"quarter hydrate", 0.5:"hemihydrate", 1:"monohydrate",
+  1.5:"sesquihydrate",    2:"dihydrate",     3:"trihydrate",
+  4:"tetrahydrate",       5:"pentahydrate",  6:"hexahydrate",
+  7:"heptahydrate",       8:"octahydrate",   9:"nonahydrate",
+  10:"decahydrate",
+};
+
+const hydration = { name: null, formula: null };
+let activeField  = null;
+
+/* ── Hydration modal ──────────────────────────────────────────────────── */
+// Use Bootstrap's show.bs.modal event to reliably capture which field opened
+// the modal, avoiding race conditions with Bootstrap's own click handlers.
+const hydrationModal = document.getElementById("hydrationModal");
+hydrationModal.addEventListener("show.bs.modal", function (event) {
+  const trigger = event.relatedTarget;  // the button that triggered the modal
+  activeField = trigger ? trigger.dataset.field : activeField;
+  const cur = hydration[activeField] || null;
+  document.getElementById("hydration-input").value = cur !== null ? cur : "";
+  updatePreview(cur);
+});
+
+document.getElementById("hydration-input").addEventListener("input", function () {
+  const v = parseFloat(this.value);
+  updatePreview(isNaN(v) ? null : v);
+});
+
+function updatePreview(val) {
+  const el = document.getElementById("hydration-preview");
+  if (!val || isNaN(val)) { el.textContent = ""; return; }
+  el.textContent = SUFFIXES[val] ? `→ ${SUFFIXES[val]}` : `→ ×${val} H₂O`;
+}
+
+document.getElementById("hydration-confirm").addEventListener("click", () => {
+  const val = parseFloat(document.getElementById("hydration-input").value);
+  if (!activeField) return;                          // safety guard
+  if (!isNaN(val) && val > 0) {
+    hydration[activeField] = val;
+    const badge = document.getElementById(`${activeField}-hydration-badge`);
+    if (badge) {
+      badge.textContent = `Hydration: ${SUFFIXES[val] || "×"+val+"H₂O"}`;
+      badge.style.display = "inline";
+    }
+  }
+  // Programmatically close the modal after setting value
+  bootstrap.Modal.getInstance(hydrationModal)?.hide();
+});
+
+// Remove data-bs-dismiss from the button to prevent Bootstrap closing before our handler
+document.getElementById("hydration-confirm").removeAttribute("data-bs-dismiss");
+
+document.getElementById("hydration-clear").addEventListener("click", () => {
+  if (activeField) {
+    hydration[activeField] = null;
+    const badge = document.getElementById(`${activeField}-hydration-badge`);
+    if (badge) badge.style.display = "none";
+  }
+  document.getElementById("hydration-input").value = "";
+  document.getElementById("hydration-preview").textContent = "";
+});
+
+/* ── Search ───────────────────────────────────────────────────────────── */
+function setLoading() {
+  document.getElementById("search-results").innerHTML =
+    `<div class="text-center text-muted py-4">
+       <div class="spinner-border spinner-border-sm me-2"></div>
+       Searching external databases&hellip; this may take a few seconds.
+     </div>`;
+}
+
+function runSearch(type, query, hyd) {
+  query = query.trim();
+  if (!query) return;
+  setLoading();
+  let url = `/search/api/${type}?q=${encodeURIComponent(query)}`;
+  if (hyd) url += `&hydration=${hyd}`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(renderResult)
+    .catch(() => showError("Network error. Please try again."));
+}
+
+function renderResult(data) {
+  const el = document.getElementById("search-results");
+
+  if (data.status === "ok") {
+    const r = data.result;
+    const formula = r.molecular_formula
+      ? `<span class="text-mono text-muted me-2">${r.molecular_formula}</span>` : "";
+    const mw = r.molecular_weight
+      ? `<span class="text-muted me-2">${r.molecular_weight} g/mol</span>` : "";
+    const cas = `CAS <span class="text-mono">${r.cas_number}</span>`;
+    const ec  = r.ec_number
+      ? `&ensp;EC <span class="text-mono">${r.ec_number}</span>` : "";
+
+    const nn = r.name_notations || {};
+    const noteParts = [];
+    if (nn.traditional && nn.traditional !== r.display_name)
+      noteParts.push(
+        `<span class="text-secondary">Traditional:</span> ${nn.traditional}`);
+    if (nn.iupac && nn.iupac !== r.display_name)
+      noteParts.push(
+        `<span class="text-secondary">IUPAC:</span> ${nn.iupac}`);
+    const notationLine = noteParts.length
+      ? `<div class="small text-muted mb-1">${noteParts.join("&ensp;·&ensp;")}</div>`
+      : "";
+
+    el.innerHTML = `
+      <div class="card shadow-sm result-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <h5 class="mb-1">${r.display_name || r.cas_number}</h5>
+              ${notationLine}
+              <div class="small">${formula}${mw}${cas}${ec}</div>
+            </div>
+            <a href="/reagent/${r.cas_number}" class="btn btn-primary btn-sm">
+              <i class="bi bi-card-text me-1"></i>Open Reagent Card
+            </a>
+          </div>
+          ${r.pictogram_codes && r.pictogram_codes.length
+            ? `<div class="d-flex gap-1 mt-3">
+                 ${r.pictogram_codes.map(c =>
+                   `<img src="/static/pictograms/${c}.png" alt="${c}"
+                         title="${c}" class="pictogram-img"
+                         onerror="this.style.display='none'">`
+                 ).join("")}
+               </div>` : ""}
+        </div>
+      </div>`;
+
+  } else if (data.status === "ambiguous") {
+    showDisambiguationModal(data.variants);
+
+  } else if (data.status === "hydration_not_found") {
+    el.innerHTML = `
+      <div class="alert alert-warning d-flex gap-2 align-items-start">
+        <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+        <div><strong>Hydrate not found.</strong><br>
+          <span class="small">${data.message}</span></div>
+      </div>`;
+
+  } else {
+    el.innerHTML = `
+      <div class="alert alert-secondary d-flex gap-2 align-items-start">
+        <i class="bi bi-info-circle mt-1 flex-shrink-0"></i>
+        <div><strong>No results.</strong><br>
+          <span class="small">${data.message || "Try a different search term."}</span></div>
+      </div>`;
+  }
+}
+
+function showError(msg) {
+  document.getElementById("search-results").innerHTML =
+    `<div class="alert alert-danger">${msg}</div>`;
+}
+
+function showDisambiguationModal(variants) {
+  const list = document.getElementById("disambiguate-list");
+  if (!variants || !variants.length) {
+    showError("Multiple results found but could not be listed."); return;
+  }
+  list.innerHTML = variants.map(v => {
+    const trad = v.traditional_name
+      ? `<div class="small text-muted mt-1">${v.traditional_name}</div>` : "";
+    return `
+    <a href="/reagent/${v.cas_number}"
+       class="list-group-item list-group-item-action px-3 py-2">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <span class="fw-semibold">${v.display_name || v.cas_number}</span>
+          ${v.molecular_formula
+            ? `<span class="text-mono text-muted ms-2 small">${v.molecular_formula}</span>`
+            : ""}
+          ${trad}
+        </div>
+        <span class="text-mono text-muted small">${v.cas_number}</span>
+      </div>
+    </a>`;
+  }).join("");
+  new bootstrap.Modal(document.getElementById("disambiguateModal")).show();
+  document.getElementById("search-results").innerHTML =
+    `<div class="alert alert-info small">
+       <i class="bi bi-list-ul me-1"></i>
+       Multiple compounds found — select one from the list.
+     </div>`;
+}
+
+/* ── Enter + button bindings ──────────────────────────────────────────── */
+[
+  ["cas-input",     "cas-btn",     "cas",     null],
+  ["name-input",    "name-btn",    "name",    "name"],
+  ["formula-input", "formula-btn", "formula", "formula"],
+].forEach(([inputId, btnId, type, hydField]) => {
+  const input = document.getElementById(inputId);
+  const btn   = document.getElementById(btnId);
+  const go = () => runSearch(type, input.value, hydField ? hydration[hydField] : null);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  btn.addEventListener("click", go);
+});
+
+/* ── Autocomplete (name field) ────────────────────────────────────────── */
+let acTimer = null;
+const nameInput = document.getElementById("name-input");
+const acList    = document.getElementById("name-autocomplete");
+
+nameInput.addEventListener("input", function () {
+  clearTimeout(acTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { acList.style.display = "none"; return; }
+  acTimer = setTimeout(() => {
+    fetch(`/search/api/autocomplete?q=${encodeURIComponent(q)}`)
+      .then(r => r.json())
+      .then(data => {
+        acList.innerHTML = "";
+        if (!data.suggestions || !data.suggestions.length) {
+          acList.style.display = "none"; return;
+        }
+        data.suggestions.forEach(s => {
+          const li = document.createElement("li");
+          li.className = "list-group-item list-group-item-action py-1 small";
+          li.textContent = s;
+          li.addEventListener("mousedown", e => {
+            e.preventDefault(); // keep focus on input
+            nameInput.value = s;
+            acList.style.display = "none";
+          });
+          acList.appendChild(li);
+        });
+        acList.style.display = "block";
+      })
+      .catch(() => { acList.style.display = "none"; });
+  }, 300);
+});
+
+document.addEventListener("click", e => {
+  if (!nameInput.contains(e.target) && !acList.contains(e.target))
+    acList.style.display = "none";
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+   CREATE MIXTURE SECTION
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Toggle chevron icon when the collapse opens/closes */
+const mixtureSection = document.getElementById("mixtureSection");
+mixtureSection.addEventListener("show.bs.collapse", () => {
+  document.getElementById("mixture-chevron").className = "bi bi-chevron-up";
+});
+mixtureSection.addEventListener("hide.bs.collapse", () => {
+  document.getElementById("mixture-chevron").className = "bi bi-chevron-down";
+});
+
+/* ── Row factory ──────────────────────────────────────────────────────── */
+let mixRowIdx = 0;   // unique id counter
+
+/*
+ * Build one compound/solvent row.
+ * kind: "compound" | "solvent"
+ * Returns the <div> element.
+ */
+function makeMixRow(kind) {
+  const idx   = mixRowIdx++;
+  const units = kind === "solvent"
+    ? ["L", "mL", "µL"]
+    : ["mol", "mmol", "µmol", "g", "mg", "µg"];
+  const defUnit = kind === "solvent" ? "mL" : "mmol";
+
+  const div = document.createElement("div");
+  div.className = "mb-2 mix-row";
+  div.dataset.kind = kind;
+  div.dataset.idx  = idx;
+  div.dataset.reagentId = "";   // filled on resolve
+
+  div.innerHTML = `
+    <div class="input-group input-group-sm">
+      <select class="form-select mix-search-type" style="max-width:90px;" title="Search by…">
+        <option value="auto">Auto</option>
+        <option value="name">Name</option>
+        <option value="formula">Formula</option>
+        <option value="cas">CAS/EC</option>
+      </select>
+      <input type="text" class="form-control mix-search-input"
+             placeholder="${kind === "solvent" ? "Solvent…" : "Compound…"}"
+             autocomplete="off" />
+      <input type="number" class="form-control mix-amount" style="max-width:90px;"
+             min="0" step="any" placeholder="Amount" />
+      <select class="form-select mix-unit" style="min-width:85px; max-width:110px;">
+        ${units.map(u => `<option${u === defUnit ? " selected" : ""}>${u}</option>`).join("")}
+      </select>
+      <button type="button" class="btn btn-outline-danger mix-remove-btn"
+              title="Remove">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="mix-row-status mt-1" style="font-size:0.75rem;"></div>`;
+
+  /* Remove button */
+  div.querySelector(".mix-remove-btn").addEventListener("click", () => {
+    div.remove();
+    validateMixture();
+  });
+
+  /* Changing search type clears any prior resolved state */
+  div.querySelector(".mix-search-type").addEventListener("change", () => {
+    div.dataset.reagentId    = "";
+    div.dataset.resolvedText = "";
+    div.querySelector(".mix-row-status").innerHTML = "";
+    validateMixture();
+  });
+
+  /* Search on Enter */
+  const searchInput = div.querySelector(".mix-search-input");
+  searchInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); resolveMixInput(div); }
+  });
+  searchInput.addEventListener("blur", () => resolveMixInput(div));
+
+  /* Revalidate on amount/unit change */
+  div.querySelector(".mix-amount").addEventListener("input", validateMixture);
+  div.querySelector(".mix-unit").addEventListener("change",  validateMixture);
+
+  return div;
+}
+
+/* Add initial rows */
+const compoundsBox = document.getElementById("mix-compounds-rows");
+const solventsBox  = document.getElementById("mix-solvents-rows");
+
+function addCompoundRow() {
+  compoundsBox.appendChild(makeMixRow("compound"));
+  validateMixture();
+}
+function addSolventRow() {
+  solventsBox.appendChild(makeMixRow("solvent"));
+  validateMixture();
+}
+
+addCompoundRow();
+addCompoundRow();
+addSolventRow();
+
+document.getElementById("mix-add-compound").addEventListener("click", addCompoundRow);
+document.getElementById("mix-add-solvent").addEventListener("click",  addSolventRow);
+
+/* ── Resolve a single row's search input ─────────────────────────────── */
+/*
+ * Determine search endpoint by content:
+ *   EC pattern  (NNN-NNN-N)  → /search/api/cas (handles EC too)
+ *   CAS pattern              → /search/api/cas
+ *   starts with element char → /search/api/formula
+ *   otherwise                → /search/api/name
+ */
+const CAS_RE = /^\d{2,7}-\d{2}-\d$/;
+const EC_RE  = /^\d{3}-\d{3}-\d$/;
+// Detect molecular formulas: must start with uppercase letter and contain
+// either a digit or multiple uppercase letters (e.g. H2O, NaCl, CuSO4)
+const ELEM_RE = /^[A-Z][a-z]?\d/;
+const FORMULA_RE = /^[A-Z][a-z]?(\d+)?([A-Z][a-z]?(\d+)?){1,}/;
+
+function guessEndpoint(q) {
+  if (EC_RE.test(q))      return "cas";
+  if (CAS_RE.test(q))     return "cas";
+  if (ELEM_RE.test(q))    return "formula";
+  if (FORMULA_RE.test(q) && !q.includes(" "))  return "formula";
+  return "name";
+}
+
+/* Map rowDiv → Promise<void> for in-flight resolves */
+const _pendingResolves = new Map();
+
+function resolveMixInput(rowDiv) {
+  const input    = rowDiv.querySelector(".mix-search-input");
+  const q        = input.value.trim();
+  const statusEl = rowDiv.querySelector(".mix-row-status");
+
+  if (!q) {
+    rowDiv.dataset.reagentId = "";
+    statusEl.innerHTML = "";
+    validateMixture();
+    return Promise.resolve();
+  }
+  /* Already resolved to the same text — nothing to do */
+  if (rowDiv.dataset.resolvedText === q && rowDiv.dataset.reagentId) {
+    return Promise.resolve();
+  }
+  /* Already resolving — return the existing promise */
+  if (_pendingResolves.has(rowDiv)) return _pendingResolves.get(rowDiv);
+
+  const searchType = rowDiv.querySelector(".mix-search-type")?.value || "auto";
+  const ep = searchType === "auto" ? guessEndpoint(q) : searchType;
+  statusEl.innerHTML =
+    `<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>Searching…</span>`;
+
+  const promise = fetch(`/search/api/${ep}?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === "ok") {
+        const r = data.result;
+        rowDiv.dataset.reagentId    = r.id || "";
+        rowDiv.dataset.resolvedText = q;
+        statusEl.innerHTML =
+          `<span class="text-success"><i class="bi bi-check-circle me-1"></i>
+           <strong>${escHtml(r.display_name || r.cas_number)}</strong>
+           <span class="text-muted ms-1 text-mono small">${escHtml(r.cas_number)}</span></span>`;
+      } else if (data.status === "ambiguous") {
+        showMixDisambiguate(data.variants, rowDiv);
+      } else {
+        rowDiv.dataset.reagentId    = "";
+        rowDiv.dataset.resolvedText = "";
+        statusEl.innerHTML =
+          `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Not found.</span>`;
+      }
+      validateMixture();
+    })
+    .catch(() => {
+      rowDiv.dataset.reagentId = "";
+      statusEl.innerHTML = `<span class="text-danger">Network error.</span>`;
+      validateMixture();
+    })
+    .finally(() => { _pendingResolves.delete(rowDiv); });
+
+  _pendingResolves.set(rowDiv, promise);
+  return promise;
+}
+
+/* ── Disambiguation modal (reuse existing) ────────────────────────────── */
+let _pendingDisambigRow = null;
+
+function showMixDisambiguate(variants, rowDiv) {
+  _pendingDisambigRow = rowDiv;
+  const list = document.getElementById("disambiguate-list");
+  list.innerHTML = variants.map(v => {
+    const trad = v.traditional_name
+      ? `<div class="small text-muted mt-1">${escHtml(v.traditional_name)}</div>` : "";
+    return `
+    <button type="button"
+       class="list-group-item list-group-item-action px-3 py-2 mix-disambig-btn"
+       data-reagent-id="${v.id || ""}"
+       data-display-name="${escHtml(v.display_name || v.cas_number)}"
+       data-cas="${escHtml(v.cas_number)}">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <span class="fw-semibold">${escHtml(v.display_name || v.cas_number)}</span>
+          ${v.molecular_formula
+            ? `<span class="text-mono text-muted ms-2 small">${escHtml(v.molecular_formula)}</span>`
+            : ""}
+          ${trad}
+        </div>
+        <span class="text-mono text-muted small">${escHtml(v.cas_number)}</span>
+      </div>
+    </button>`;
+  }).join("");
+
+  /* Attach click handlers */
+  list.querySelectorAll(".mix-disambig-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!_pendingDisambigRow) return;
+      const rid  = btn.dataset.reagentId;   // present for DB-resident variants
+      const name = btn.dataset.displayName;
+      const cas  = btn.dataset.cas;
+      const row  = _pendingDisambigRow;
+      _pendingDisambigRow = null;
+      bootstrap.Modal.getInstance(document.getElementById("disambiguateModal"))?.hide();
+
+      if (rid) {
+        /* Already in DB — store directly */
+        row.dataset.reagentId    = rid;
+        row.dataset.resolvedText = row.querySelector(".mix-search-input").value.trim();
+        row.querySelector(".mix-row-status").innerHTML =
+          `<span class="text-success"><i class="bi bi-check-circle me-1"></i>
+           <strong>${escHtml(name)}</strong>
+           <span class="text-muted ms-1 text-mono small">${escHtml(cas)}</span></span>`;
+        validateMixture();
+      } else {
+        /* External variant — do CAS lookup to create in DB and get id */
+        const statusEl = row.querySelector(".mix-row-status");
+        statusEl.innerHTML =
+          `<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>Loading…</span>`;
+        fetch(`/search/api/cas?q=${encodeURIComponent(cas)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === "ok") {
+              row.dataset.reagentId    = data.result.id || "";
+              row.dataset.resolvedText = row.querySelector(".mix-search-input").value.trim();
+              statusEl.innerHTML =
+                `<span class="text-success"><i class="bi bi-check-circle me-1"></i>
+                 <strong>${escHtml(data.result.display_name || cas)}</strong>
+                 <span class="text-muted ms-1 text-mono small">${escHtml(cas)}</span></span>`;
+            } else {
+              row.dataset.reagentId = "";
+              statusEl.innerHTML = `<span class="text-danger">Could not load compound.</span>`;
+            }
+            validateMixture();
+          })
+          .catch(() => {
+            row.dataset.reagentId = "";
+            statusEl.innerHTML = `<span class="text-danger">Network error.</span>`;
+            validateMixture();
+          });
+      }
+    });
+  });
+
+  new bootstrap.Modal(document.getElementById("disambiguateModal")).show();
+}
+
+/* ── Validation → enable/disable Create button ────────────────────────── */
+function validateMixture() {
+  const nameOk = document.getElementById("mix-name").value.trim().length > 0;
+
+  const compRows = [...compoundsBox.querySelectorAll(".mix-row")];
+  const solvRows = [...solventsBox.querySelectorAll(".mix-row")];
+
+  const compOk = compRows.some(r =>
+    r.dataset.reagentId &&
+    parseFloat(r.querySelector(".mix-amount").value) > 0
+  );
+  const solvOk = solvRows.some(r =>
+    r.dataset.reagentId &&
+    parseFloat(r.querySelector(".mix-amount").value) > 0
+  );
+
+  document.getElementById("mix-create-btn").disabled = !(nameOk && compOk && solvOk);
+}
+
+document.getElementById("mix-name").addEventListener("input", validateMixture);
+
+/* ── Create special solution ──────────────────────────────────────────── */
+document.getElementById("mix-create-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("mix-create-btn");
+  btn.disabled  = true;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Resolving…`;
+
+  /* Trigger resolve on every row that has text but no id yet, then wait */
+  const allRows = [
+    ...compoundsBox.querySelectorAll(".mix-row"),
+    ...solventsBox.querySelectorAll(".mix-row"),
+  ];
+  const unresolvedPromises = allRows
+    .filter(r => r.querySelector(".mix-search-input").value.trim() && !r.dataset.reagentId)
+    .map(r => resolveMixInput(r));
+  /* Also wait for any already-in-flight resolves */
+  const inFlight = Array.from(_pendingResolves.values());
+  await Promise.allSettled([...unresolvedPromises, ...inFlight]);
+
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Creating…`;
+
+  const name        = document.getElementById("mix-name").value.trim();
+  const description = document.getElementById("mix-description").value.trim();
+  const author      = document.getElementById("mix-author").value.trim();
+
+  function collectRows(box) {
+    return [...box.querySelectorAll(".mix-row")]
+      .filter(r => r.dataset.reagentId && parseFloat(r.querySelector(".mix-amount").value) > 0)
+      .map(r => ({
+        reagent_id:  parseInt(r.dataset.reagentId),
+        amount:      parseFloat(r.querySelector(".mix-amount").value),
+        amount_unit: r.querySelector(".mix-unit").value,
+      }));
+  }
+
+  const payload = {
+    name,
+    description: description || null,
+    author:      author      || null,
+    components:  collectRows(compoundsBox),
+    solvents:    collectRows(solventsBox),
+  };
+
+  fetch("/mixtures/api/create", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === "ok") {
+      window.location.href = `/mixtures/${data.mix_id}`;
+    } else {
+      const msgs = data.errors
+        ? Object.values(data.errors).join(" / ")
+        : (data.message || "Error creating mixture.");
+      const msgEl = document.getElementById("mix-msg");
+      msgEl.textContent   = msgs;
+      msgEl.className     = "alert alert-danger py-2 small mb-3";
+      msgEl.style.display = "";
+      btn.disabled        = false;
+      btn.innerHTML       = `<i class="bi bi-check2-circle me-1"></i>Create Special Solution`;
+    }
+  })
+  .catch(() => {
+    const msgEl = document.getElementById("mix-msg");
+    msgEl.textContent   = "Network error.";
+    msgEl.className     = "alert alert-danger py-2 small mb-3";
+    msgEl.style.display = "";
+    btn.disabled        = false;
+    btn.innerHTML       = `<i class="bi bi-check2-circle me-1"></i>Create Special Solution`;
+  });
+});
+
+function escHtml(s) {
+  if (!s) return "";
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+</script>
+{% endblock %}

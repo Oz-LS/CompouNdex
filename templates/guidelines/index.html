@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% block title %}Guidelines{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* ── Layout ──────────────────────────────────────────────────────────── */
+  .gl-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0 1rem;
+    min-height: calc(100vh - 140px);
+  }
+  .gl-sidebar {
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+  .gl-viewer-area {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .gl-rag-area {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 1rem;
+  }
+
+  /* ── Sidebar ─────────────────────────────────────────────────────────── */
+  .gl-doc-item {
+    cursor: pointer;
+    border-radius: 5px;
+    padding: 0.45rem 0.65rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.83rem;
+    transition: background 0.1s;
+    color: #212529;
+    text-decoration: none;
+    border: 1px solid transparent;
+  }
+  .gl-doc-item:hover   { background: #f0f0f0; }
+  .gl-doc-item.active  {
+    background: #e8efff;
+    border-color: #c0d0ff;
+    font-weight: 600;
+    color: #0d3a8e;
+  }
+  .gl-doc-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gl-doc-meta {
+    font-size: 0.72rem;
+    color: #999;
+    white-space: nowrap;
+  }
+
+  /* ── Viewer ──────────────────────────────────────────────────────────── */
+  .gl-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  #gl-viewer {
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 480px;
+    background: #fff;
+  }
+  #gl-pdf-frame {
+    width: 100%;
+    height: 100%;
+    min-height: 480px;
+    border: none;
+    display: block;
+  }
+  #gl-md-body {
+    padding: 1.5rem 1.75rem;
+    overflow-y: auto;
+    max-height: 72vh;
+    font-size: 0.9rem;
+    line-height: 1.65;
+  }
+  /* Markdown rendered styles */
+  #gl-md-body h1 { font-size: 1.35rem; font-weight: 700; margin-top: 1.2rem; }
+  #gl-md-body h2 { font-size: 1.1rem;  font-weight: 700; margin-top: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.25rem; }
+  #gl-md-body h3 { font-size: 0.95rem; font-weight: 600; margin-top: 0.85rem; }
+  #gl-md-body code { background: #f4f4f4; padding: 1px 4px; border-radius: 3px; font-size: 0.85em; }
+  #gl-md-body pre  { background: #f4f4f4; padding: 0.75rem 1rem; border-radius: 5px; overflow-x: auto; }
+  #gl-md-body pre code { background: none; padding: 0; }
+  #gl-md-body table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin: 0.75rem 0; }
+  #gl-md-body th, #gl-md-body td { border: 1px solid #dee2e6; padding: 0.4rem 0.65rem; }
+  #gl-md-body th { background: #f8f9fa; font-weight: 600; }
+  #gl-md-body blockquote { border-left: 3px solid #0d6efd; padding-left: 0.75rem; color: #555; margin: 0.5rem 0; }
+  #gl-md-body a { color: #0d6efd; }
+  #gl-md-body ul, #gl-md-body ol { padding-left: 1.5rem; }
+  #gl-md-body li { margin-bottom: 0.2rem; }
+
+  /* ── RAG panel ───────────────────────────────────────────────────────── */
+  .rag-panel {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .rag-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0.55rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .rag-coming-soon {
+    font-size: 0.72rem;
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid #ffc107;
+    font-weight: 600;
+  }
+  .rag-body { padding: 0.75rem 1rem; }
+  .rag-messages {
+    min-height: 80px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 0.5rem;
+    font-size: 0.83rem;
+  }
+  .rag-msg-notice {
+    color: #888;
+    font-style: italic;
+    font-size: 0.8rem;
+    padding: 0.4rem 0;
+  }
+  .rag-input-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  /* ── Empty state ─────────────────────────────────────────────────────── */
+  .gl-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 300px;
+    color: #aaa;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  /* ── Dark mode ──────────────────────────────────────────────────────── */
+  [data-bs-theme="dark"] .gl-doc-item { color: #dee2e6; }
+  [data-bs-theme="dark"] .gl-doc-item:hover { background: #343a40; }
+  [data-bs-theme="dark"] .gl-doc-item.active {
+    background: #1e2a40; border-color: #3a5a8a; color: #7db4ff;
+  }
+  [data-bs-theme="dark"] .gl-doc-meta { color: #777; }
+  [data-bs-theme="dark"] #gl-viewer {
+    border-color: #444; background: #212529;
+  }
+  [data-bs-theme="dark"] #gl-md-body h2 { border-bottom-color: #444; }
+  [data-bs-theme="dark"] #gl-md-body code { background: #2a2e33; }
+  [data-bs-theme="dark"] #gl-md-body pre  { background: #2a2e33; }
+  [data-bs-theme="dark"] #gl-md-body th { background: #2b2f33; }
+  [data-bs-theme="dark"] #gl-md-body th,
+  [data-bs-theme="dark"] #gl-md-body td { border-color: #555; }
+  [data-bs-theme="dark"] #gl-md-body blockquote { border-left-color: #4d8bff; color: #aab0b8; }
+  [data-bs-theme="dark"] #gl-md-body a { color: #6ea8ff; }
+  [data-bs-theme="dark"] .rag-panel { border-color: #444; background: #212529; }
+  [data-bs-theme="dark"] .rag-header { background: #2b2f33; border-bottom-color: #444; }
+  [data-bs-theme="dark"] .rag-coming-soon { background: #3d3418; color: #d4a94d; border-color: #7a6422; }
+  [data-bs-theme="dark"] .rag-msg-notice { color: #777; }
+  [data-bs-theme="dark"] .gl-empty { color: #666; }
+
+  @media (max-width: 768px) {
+    .gl-layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+    }
+    .gl-sidebar    { grid-column: 1; grid-row: 1; }
+    .gl-viewer-area{ grid-column: 1; grid-row: 2; }
+    .gl-rag-area   { grid-column: 1; grid-row: 3; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h5 mb-0 fw-normal text-muted">Guidelines &amp; Documents</h1>
+  <a href="#" class="btn btn-outline-secondary btn-sm"
+     title="Refresh document list" onclick="refreshList(event)">
+    <i class="bi bi-arrow-clockwise"></i>
+  </a>
+</div>
+
+<div class="gl-layout">
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────────── -->
+  <aside class="gl-sidebar">
+    <div class="card shadow-sm">
+      <div class="card-header py-2">
+        <span class="section-title mb-0">Documents</span>
+      </div>
+
+      <!-- Search filter -->
+      <div class="p-2 border-bottom">
+        <input id="sidebar-search" type="text"
+               class="form-control form-control-sm"
+               placeholder="Filter…" oninput="filterSidebar(this.value)"/>
+      </div>
+
+      <div class="card-body p-2" id="sidebar-list" style="max-height:60vh; overflow-y:auto;">
+        {% if documents %}
+          {% for doc in documents %}
+          <div class="gl-doc-item {% if doc.filename == selected %}active{% endif %}"
+               data-filename="{{ doc.filename }}"
+               data-type="{{ doc.type }}"
+               data-title="{{ doc.title }}"
+               onclick="openDoc('{{ doc.filename }}', '{{ doc.type }}', '{{ doc.title }}')">
+            {% if doc.type == 'pdf' %}
+              <i class="bi bi-file-earmark-pdf text-danger flex-shrink-0"></i>
+            {% else %}
+              <i class="bi bi-file-earmark-text text-primary flex-shrink-0"></i>
+            {% endif %}
+            <span class="gl-doc-title">{{ doc.title }}</span>
+            <span class="gl-doc-meta">{{ doc.size_kb }} KB</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted small p-2 text-center">
+            No documents found.<br>
+            Place PDF or Markdown files in<br>
+            <code>static/guidelines/</code>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if documents %}
+      <div class="card-footer py-2 text-muted" style="font-size:0.75rem;">
+        {{ documents | length }} document{{ 's' if documents | length != 1 else '' }}
+      </div>
+      {% endif %}
+    </div>
+  </aside>
+
+  <!-- ── Viewer ─────────────────────────────────────────────────────────── -->
+  <section class="gl-viewer-area">
+    <div class="gl-viewer-header">
+      <div>
+        <span id="viewer-title" class="fw-semibold" style="font-size:0.95rem;">
+          {% if selected %}{{ selected }}{% else %}Select a document{% endif %}
+        </span>
+        <span id="viewer-badge" class="badge bg-light text-secondary ms-2"
+              style="display:none;"></span>
+      </div>
+      <div class="d-flex gap-2" id="viewer-actions" style="display:none !important;">
+        <a id="viewer-download-btn" href="#" target="_blank"
+           class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-download me-1"></i>Download
+        </a>
+        <a id="viewer-external-btn" href="#" target="_blank"
+           class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Open in new tab
+        </a>
+      </div>
+    </div>
+
+    <div id="gl-viewer">
+
+      <!-- Empty state (default) -->
+      <div id="gl-empty" class="gl-empty">
+        <i class="bi bi-journal-text opacity-25" style="font-size:3rem;"></i>
+        <p class="mt-3 mb-0">Select a document from the list</p>
+      </div>
+
+      <!-- PDF viewer -->
+      <iframe id="gl-pdf-frame" src="" style="display:none;"></iframe>
+
+      <!-- Markdown viewer -->
+      <div id="gl-md-body" style="display:none;"></div>
+
+      <!-- Loading spinner -->
+      <div id="gl-loading" class="gl-empty" style="display:none;">
+        <div class="spinner-border text-secondary spinner-border-sm mb-2"></div>
+        <span class="small text-muted">Loading…</span>
+      </div>
+
+      <!-- Error state -->
+      <div id="gl-error" class="gl-empty" style="display:none;">
+        <i class="bi bi-exclamation-triangle text-warning opacity-50"
+           style="font-size:2.5rem;"></i>
+        <p class="mt-2 text-muted small" id="gl-error-msg">Could not load document.</p>
+      </div>
+
+    </div><!-- /gl-viewer -->
+  </section>
+
+  <!-- ── RAG / AI Assistant ─────────────────────────────────────────────── -->
+  <section class="gl-rag-area">
+    <div class="rag-panel">
+      <div class="rag-header">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-robot text-secondary"></i>
+          <span class="section-title mb-0">AI Assistant</span>
+        </div>
+        <span class="rag-coming-soon">Coming soon</span>
+      </div>
+      <div class="rag-body">
+        <div class="rag-messages" id="rag-messages">
+          <div class="rag-msg-notice">
+            <i class="bi bi-info-circle me-1"></i>
+            The AI assistant will answer questions about the loaded guidelines.
+            This feature will be enabled in a future update.
+          </div>
+        </div>
+        <div class="rag-input-row">
+          <input id="rag-input" type="text" class="form-control form-control-sm"
+                 placeholder="Ask a question about the guidelines…"
+                 disabled/>
+          <button class="btn btn-primary btn-sm" id="rag-send-btn" disabled>
+            <i class="bi bi-send"></i>
+          </button>
+        </div>
+        <div class="mt-1 text-muted" style="font-size:0.72rem;">
+          <i class="bi bi-lock me-1"></i>
+          Answers will be grounded in the indexed documents — no external knowledge.
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /gl-layout -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── Document opener ──────────────────────────────────────────────────── */
+function showPanel(id) {
+  ["gl-empty","gl-pdf-frame","gl-md-body","gl-loading","gl-error"]
+    .forEach(pid => {
+      const el = document.getElementById(pid);
+      if (el) el.style.display = "none";
+    });
+  const el = document.getElementById(id);
+  if (el) el.style.display = "block";
+}
+
+function openDoc(filename, type, title) {
+  // Update sidebar active state
+  document.querySelectorAll(".gl-doc-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.filename === filename);
+  });
+
+  // Update header
+  document.getElementById("viewer-title").textContent = title || filename;
+  const badge = document.getElementById("viewer-badge");
+  badge.textContent = type.toUpperCase();
+  badge.style.display = "inline";
+
+  // Show action buttons
+  const actions    = document.getElementById("viewer-actions");
+  const viewUrl    = `/guidelines/view/${encodeURIComponent(filename)}`;
+  actions.style.removeProperty("display");  // clear !important override
+  actions.style.display = "flex";
+  document.getElementById("viewer-download-btn").href  = viewUrl;
+  document.getElementById("viewer-external-btn").href  = viewUrl;
+
+  if (type === "pdf") {
+    showPanel("gl-pdf-frame");
+    document.getElementById("gl-pdf-frame").src = viewUrl;
+
+  } else if (type === "md") {
+    showPanel("gl-loading");
+    fetch(`/guidelines/api/render/${encodeURIComponent(filename)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === "ok") {
+          document.getElementById("gl-md-body").innerHTML = data.html;
+          showPanel("gl-md-body");
+        } else {
+          document.getElementById("gl-error-msg").textContent =
+            data.message || "Failed to render document.";
+          showPanel("gl-error");
+        }
+      })
+      .catch(() => {
+        document.getElementById("gl-error-msg").textContent =
+          "Network error — could not load document.";
+        showPanel("gl-error");
+      });
+  }
+
+  // Update URL without reloading (for bookmarking)
+  const url = new URL(window.location.href);
+  url.searchParams.set("doc", filename);
+  history.replaceState(null, "", url.toString());
+}
+
+/* ── Sidebar search filter ────────────────────────────────────────────── */
+function filterSidebar(q) {
+  q = q.toLowerCase().trim();
+  document.querySelectorAll(".gl-doc-item").forEach(el => {
+    const title = (el.dataset.title || el.dataset.filename).toLowerCase();
+    el.style.display = (!q || title.includes(q)) ? "flex" : "none";
+  });
+}
+
+/* ── Refresh document list ────────────────────────────────────────────── */
+function refreshList(e) {
+  e.preventDefault();
+  fetch("/guidelines/api/documents")
+    .then(r => r.json())
+    .then(data => {
+      const list = document.getElementById("sidebar-list");
+      const docs = data.documents || [];
+      if (!docs.length) {
+        list.innerHTML = `<div class="text-muted small p-2 text-center">
+          No documents found.<br>
+          Place PDF or Markdown files in<br>
+          <code>static/guidelines/</code></div>`;
+        return;
+      }
+      list.innerHTML = docs.map(doc => `
+        <div class="gl-doc-item"
+             data-filename="${doc.filename}"
+             data-type="${doc.type}"
+             data-title="${doc.title}"
+             onclick="openDoc('${doc.filename}','${doc.type}','${doc.title}')">
+          <i class="bi bi-file-earmark-${doc.type==='pdf'?'pdf text-danger':'text text-primary'} flex-shrink-0"></i>
+          <span class="gl-doc-title">${doc.title}</span>
+          <span class="gl-doc-meta">${doc.size_kb} KB</span>
+        </div>`).join("");
+    });
+}
+
+/* ── RAG (stub — wired but disabled) ─────────────────────────────────── */
+document.getElementById("rag-send-btn").addEventListener("click", sendRagQuestion);
+document.getElementById("rag-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") sendRagQuestion();
+});
+
+function sendRagQuestion() {
+  const input = document.getElementById("rag-input");
+  const q = input.value.trim();
+  if (!q) return;
+
+  const msgs = document.getElementById("rag-messages");
+  msgs.innerHTML += `
+    <div class="mb-1">
+      <span class="badge bg-primary me-1">You</span>
+      <span class="small">${q}</span>
+    </div>`;
+  input.value = "";
+
+  fetch("/guidelines/api/ask", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({question: q}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    const ans = data.status === "not_implemented"
+      ? `<em class="text-muted">${data.message}</em>`
+      : (data.answer || "<em class='text-muted'>No answer.</em>");
+    msgs.innerHTML += `
+      <div class="mb-2">
+        <span class="badge bg-secondary me-1">Assistant</span>
+        <span class="small">${ans}</span>
+      </div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  })
+  .catch(() => {
+    msgs.innerHTML += `<div class="small text-danger mb-1">Network error.</div>`;
+  });
+}
+
+/* ── Auto-open pre-selected document (from URL ?doc=) ─────────────────── */
+{% if selected %}
+(function() {
+  const item = document.querySelector(
+    `.gl-doc-item[data-filename="{{ selected }}"]`
+  );
+  if (item) openDoc(
+    item.dataset.filename, item.dataset.type, item.dataset.title
+  );
+})();
+{% endif %}
+</script>
+{% endblock %}

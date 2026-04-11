@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <p class="display-6 text-muted fw-light">404</p>
+  <h1 class="h4 mb-3">Page not found</h1>
+  <p class="text-muted mb-4">
+    The page you requested does not exist.<br>
+    It may have been moved, or the URL may be incorrect.
+  </p>
+  <a href="{{ url_for('search.index') }}" class="btn btn-primary">
+    <i class="bi bi-search me-1"></i>Back to Search
+  </a>
+</div>
+{% endblock %}

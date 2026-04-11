@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% block title %}Special Solution #{{ mix_id }}{% endblock %}
+
+{% block content %}
+
+<!-- ── Loading state ─────────────────────────────────────────────────────── -->
+<div id="mx-loading" class="text-center py-5 text-muted">
+  <div class="spinner-border spinner-border-sm me-2"></div>
+  Loading special solution data&hellip;
+</div>
+
+<!-- ── Error state ───────────────────────────────────────────────────────── -->
+<div id="mx-error" style="display:none;">
+  <div class="alert alert-warning d-flex gap-2 align-items-start">
+    <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+    <div>
+      <strong>Special Solution not found.</strong><br>
+      <span class="small" id="mx-error-msg"></span>
+    </div>
+  </div>
+  <a href="{{ url_for('search.index') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Search
+  </a>
+</div>
+
+<!-- ── Main card (hidden until loaded) ───────────────────────────────────── -->
+<div id="mx-main" style="display:none;">
+
+  <!-- Header -->
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1" style="font-size:0.78rem;">
+          <li class="breadcrumb-item">
+            <a href="{{ url_for('search.index') }}" class="text-decoration-none">Search</a>
+          </li>
+          <li class="breadcrumb-item active" id="mx-breadcrumb-name">Special Solution</li>
+        </ol>
+      </nav>
+      <h1 class="h4 mb-1" id="mx-display-name">—</h1>
+      <div class="small text-muted" id="mx-subtitle"></div>
+    </div>
+
+    <!-- Label picker -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <select id="label-format-select" class="form-select form-select-sm" style="width:auto;">
+        <option value="1kg">1 kg label</option>
+        <option value="500g">500 g label</option>
+        <option value="100g" selected>100 g label</option>
+        <option value="20g">20 g label</option>
+        <option value="1g">1 g label</option>
+      </select>
+      <button class="btn btn-outline-secondary btn-sm" id="add-label-btn">
+        <i class="bi bi-tag me-1"></i>Add to Label Cart
+      </button>
+    </div>
+  </div><!-- /header -->
+
+  <!-- ══ FULL-WIDTH: Availability ══════════════════════════════════════ -->
+  <div class="card mb-3 shadow-sm" id="mx-availability-card">
+    <div class="card-header">
+      <span class="section-title mb-0">Availability</span>
+    </div>
+    <div id="mx-inv-widget" class="card-body p-0">
+      <div class="text-center text-muted py-3 small">
+        <div class="spinner-border spinner-border-sm me-1"></div>Loading…
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- ══ LEFT COLUMN ══════════════════════════════════════════════════ -->
+    <div class="col-lg-6">
+
+      <!-- Composition -->
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header">
+          <span class="section-title mb-0">Composition</span>
+        </div>
+        <div class="card-body py-3">
+
+          <p class="section-title mb-2" style="font-size:0.7rem;">Compounds (solutes)</p>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>CAS</th>
+                  <th>Amount</th>
+                  <th>Concentration</th>
+                </tr>
+              </thead>
+              <tbody id="mx-components-body">
+                <tr><td colspan="4" class="text-muted fst-italic">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="section-title mb-2" style="font-size:0.7rem;">Solvents</p>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>Amount</th>
+                  <th>Volume (L)</th>
+                </tr>
+              </thead>
+              <tbody id="mx-solvents-body">
+                <tr><td colspan="3" class="text-muted fst-italic">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-2 small text-muted">
+            Total volume: <strong id="mx-total-volume">—</strong>
+          </div>
+
+          <div id="mx-meta" class="mt-3 small text-muted" style="display:none;">
+            <div id="mx-description-row"></div>
+            <div id="mx-author-row"></div>
+            <div id="mx-notes-row"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add to inventory (simplified for special solutions) -->
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <span class="section-title mb-0">Add to Inventory</span>
+        </div>
+        <div class="card-body py-3">
+
+          <div id="mx-add-msg" class="alert alert-success py-2 small mb-3"
+               style="display:none;"></div>
+
+          <div class="row g-2">
+
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">Location</label>
+              <select id="mx-f-location" class="form-select form-select-sm">
+                <option value="cabinet_1">Cabinet 1</option>
+                <option value="cabinet_2">Cabinet 2</option>
+                <option value="solvents">Solvents</option>
+                <option value="acids">Acids</option>
+                <option value="bases">Bases</option>
+              </select>
+            </div>
+
+            <div class="col-5">
+              <label class="form-label form-label-sm mb-1">
+                Containers <span class="text-danger">*</span>
+              </label>
+              <input type="number" id="mx-f-containers"
+                     class="form-control form-control-sm"
+                     min="1" step="1" value="1" />
+            </div>
+
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">Notes</label>
+              <textarea id="mx-f-notes" class="form-control form-control-sm"
+                        rows="2" placeholder="Optional…"></textarea>
+            </div>
+
+            <div class="col-12 pt-1">
+              <button class="btn btn-primary btn-sm px-4" id="mx-add-inv-btn">
+                <i class="bi bi-plus-lg me-1"></i>Add to Inventory
+              </button>
+            </div>
+
+          </div><!-- /row -->
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ══ RIGHT COLUMN ══════════════════════════════════════════════════ -->
+    <div class="col-lg-6">
+
+      <!-- Safety -->
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="section-title mb-0">Safety (GHS/CLP) — merged</span>
+          <span id="mx-signal-word" class="fw-semibold" style="font-size:0.85rem;"></span>
+        </div>
+        <div class="card-body py-3">
+
+          <div id="mx-pictograms" class="d-flex flex-wrap gap-2 mb-3"></div>
+
+          <div id="mx-no-hazard" style="display:none;">
+            <span class="text-muted small">
+              <i class="bi bi-check-circle me-1 text-success"></i>
+              No GHS hazard data found for the components of this special solution.
+            </span>
+          </div>
+
+          <div id="mx-hazard-data">
+            <p class="section-title" style="font-size:0.7rem; margin-bottom:0.3rem;">
+              Hazard Statements (H)
+            </p>
+            <ul id="mx-h-phrases" class="list-unstyled small mb-3"></ul>
+
+            <p class="section-title" style="font-size:0.7rem; margin-bottom:0.3rem;">
+              Precautionary Statements (P)
+            </p>
+            <ul id="mx-p-phrases" class="list-unstyled small mb-2"></ul>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /row -->
+
+</div><!-- /mx-main -->
+
+<!-- ── Delete inventory entry modal ──────────────────────────────────────── -->
+<div class="modal fade" id="mxDeleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">Delete inventory entry?</h6>
+        <button type="button" class="btn-close btn-close-sm"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body small">
+        Remove this entry from the inventory? This cannot be undone.
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-secondary"
+                data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm btn-danger"
+                id="mx-del-confirm-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MIX_ID = {{ mix_id }};
+let mixtureData = null;
+
+/* ── Load mixture data ─────────────────────────────────────────────────── */
+fetch(`/mixtures/api/${MIX_ID}`)
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById("mx-loading").style.display = "none";
+    if (data.status !== "ok") {
+      document.getElementById("mx-error-msg").textContent = data.message || "";
+      document.getElementById("mx-error").style.display = "";
+      return;
+    }
+    mixtureData = data.result;
+    populateCard(mixtureData);
+    document.getElementById("mx-main").style.display = "";
+  })
+  .catch(() => {
+    document.getElementById("mx-loading").style.display = "none";
+    document.getElementById("mx-error-msg").textContent = "Network error.";
+    document.getElementById("mx-error").style.display = "";
+  });
+
+function populateCard(m) {
+  /* Header */
+  document.getElementById("mx-breadcrumb-name").textContent = m.display_name;
+  document.getElementById("mx-display-name").textContent    = m.display_name;
+  const vol = m.total_volume_L != null
+    ? `Total volume: ${(m.total_volume_L * 1000).toFixed(2)} mL`
+    : "Special Solution";
+  document.getElementById("mx-subtitle").textContent = vol;
+
+  /* Metadata */
+  const parts = [];
+  if (m.description) parts.push(`<strong>Description:</strong> ${esc(m.description)}`);
+  if (m.author)      parts.push(`<strong>Prepared by:</strong> ${esc(m.author)}`);
+  if (m.notes)       parts.push(`<strong>Notes:</strong> ${esc(m.notes)}`);
+  if (parts.length) {
+    document.getElementById("mx-meta").style.display = "";
+    document.getElementById("mx-meta").innerHTML = parts.join("<br>");
+  }
+
+  /* Total volume */
+  if (m.total_volume_L != null) {
+    document.getElementById("mx-total-volume").textContent =
+      `${(m.total_volume_L * 1000).toFixed(2)} mL (${m.total_volume_L.toFixed(4)} L)`;
+  }
+
+  /* Components table */
+  const tbody = document.getElementById("mx-components-body");
+  if (!m.components || !m.components.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted fst-italic">No compounds.</td></tr>`;
+  } else {
+    tbody.innerHTML = m.components.map(c => {
+      const conc = c.concentration_mM != null
+        ? `<span class="text-mono">${c.concentration_mM.toFixed(3)} mM</span>` : "—";
+      const cas = c.cas_number
+        ? `<span class="text-mono text-muted small">${esc(c.cas_number)}</span>` : "—";
+      return `<tr>
+        <td>${esc(c.name)}</td>
+        <td>${cas}</td>
+        <td class="text-mono">${c.amount} ${esc(c.amount_unit)}</td>
+        <td>${conc}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  /* Solvents table */
+  const sbody = document.getElementById("mx-solvents-body");
+  if (!m.solvents || !m.solvents.length) {
+    sbody.innerHTML = `<tr><td colspan="3" class="text-muted fst-italic">No solvents.</td></tr>`;
+  } else {
+    sbody.innerHTML = m.solvents.map(s => `<tr>
+      <td>${esc(s.name)}</td>
+      <td class="text-mono">${s.amount} ${esc(s.amount_unit)}</td>
+      <td class="text-mono">${s.volume_L != null ? s.volume_L.toFixed(4) : "—"}</td>
+    </tr>`).join("");
+  }
+
+  /* Safety */
+  const signalEl = document.getElementById("mx-signal-word");
+  if (m.signal_word) {
+    signalEl.textContent = m.signal_word.toUpperCase();
+    signalEl.style.color = m.signal_word === "Danger" ? "#cc0000" : "#c65000";
+  }
+
+  const picEl = document.getElementById("mx-pictograms");
+  if (m.pictogram_codes && m.pictogram_codes.length) {
+    picEl.innerHTML = m.pictogram_codes.map(code =>
+      `<img src="/static/pictograms/${code}.png" alt="${code}" title="${code}"
+            class="pictogram-img" onerror="this.style.display='none'">`
+    ).join("");
+  }
+
+  const hasHazard = (m.h_phrases && m.h_phrases.length) ||
+                    (m.p_phrases && m.p_phrases.length) ||
+                    (m.pictogram_codes && m.pictogram_codes.length);
+
+  document.getElementById("mx-no-hazard").style.display    = hasHazard ? "none" : "";
+  document.getElementById("mx-hazard-data").style.display  = hasHazard ? "" : "none";
+
+  function renderPhrases(listId, phrases) {
+    const ul = document.getElementById(listId);
+    if (!phrases || !phrases.length) {
+      ul.innerHTML = `<li class="text-muted fst-italic small">None</li>`;
+      return;
+    }
+    ul.innerHTML = phrases.map(ph => {
+      const code = ph.code || "";
+      const text = ph.text || "";
+      return `<li><span class="fw-semibold text-mono">${esc(code)}</span>
+              <span class="text-muted ms-1">${esc(text)}</span></li>`;
+    }).join("");
+  }
+  renderPhrases("mx-h-phrases", m.h_phrases);
+  renderPhrases("mx-p-phrases", m.p_phrases);
+
+  /* Inventory widget */
+  renderInventory(m.inventory_items || []);
+}
+
+let _mxDelId    = null;
+let _mxDelModal = null;
+
+function renderInventory(items) {
+  const widget = document.getElementById("mx-inv-widget");
+  const card = document.getElementById("mx-availability-card");
+  if (!items.length) {
+    widget.innerHTML =
+      `<p class="text-muted small px-3 py-3 mb-0">Not yet in inventory.</p>`;
+    return;
+  }
+  // Green tint when items exist
+  card.classList.add("border-success");
+  card.style.borderWidth = "2px";
+  card.querySelector(".card-header").classList.add("bg-success", "bg-opacity-25");
+  widget.innerHTML = `
+    <div class="table-responsive">
+      <table class="table table-sm inv-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Location</th>
+            <th>Qty</th>
+            <th style="width:110px;">Containers</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(it => `
+            <tr id="mx-inv-row-${it.id}">
+              <td><span class="badge bg-secondary inv-loc-badge">${esc(it.location_label)}</span></td>
+              <td class="small">${esc(it.quantity_display)}</td>
+              <td>
+                <div class="input-group input-group-sm flex-nowrap" style="width:100px;">
+                  <button class="btn btn-outline-secondary px-1 py-0" type="button"
+                          onclick="mxStepContainers(${it.id}, -1, this)">&minus;</button>
+                  <input type="text" inputmode="numeric" pattern="[0-9]*"
+                         class="form-control form-control-sm text-center px-0"
+                         style="width:36px; min-width:0;" value="${it.num_containers}"
+                         onchange="mxContainerChange(${it.id}, this.value, this)" />
+                  <button class="btn btn-outline-secondary px-1 py-0" type="button"
+                          onclick="mxStepContainers(${it.id}, +1, this)">+</button>
+                </div>
+              </td>
+              <td class="small text-muted" style="cursor:pointer; max-width:140px;"
+                  title="Click to edit note"
+                  onclick="mxEditNote(${it.id}, this)">
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
+                  ${esc(it.notes || "")}
+                  <i class="bi bi-pencil ms-1 opacity-25" style="font-size:0.7rem;"></i>
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-link btn-sm p-0 text-danger" title="Delete entry"
+                        onclick="mxConfirmDelete(${it.id})">
+                  <i class="bi bi-trash3" style="font-size:0.8rem;"></i>
+                </button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  _mxDelModal = new bootstrap.Modal(document.getElementById("mxDeleteModal"));
+}
+
+function mxPatchItem(id, data) {
+  fetch(`/inventory/api/items/${id}`, {
+    method:  "PATCH",
+    headers: {"Content-Type": "application/json"},
+    body:    JSON.stringify(data),
+  })
+  .then(r => r.json())
+  .then(d => { if (d.status !== "ok") console.warn("PATCH failed:", d.message); })
+  .catch(e => console.error("mxPatchItem error:", e));
+}
+
+function mxStepContainers(id, delta, btn) {
+  const input = btn.closest(".input-group").querySelector("input");
+  const newVal = Math.max(0, (parseInt(input.value) || 0) + delta);
+  input.value = newVal;
+  mxContainerChange(id, newVal, input);
+}
+
+function mxContainerChange(id, val, input) {
+  const n = parseInt(val);
+  if (isNaN(n) || n < 0) { input.value = 1; return; }
+  if (n === 0) {
+    _mxDelId = id;
+    input.value = input.defaultValue;
+    if (!_mxDelModal)
+      _mxDelModal = new bootstrap.Modal(document.getElementById("mxDeleteModal"));
+    _mxDelModal.show();
+  } else {
+    mxPatchItem(id, {num_containers: n});
+    input.defaultValue = n;
+  }
+}
+
+function mxConfirmDelete(itemId) {
+  _mxDelId = itemId;
+  if (!_mxDelModal)
+    _mxDelModal = new bootstrap.Modal(document.getElementById("mxDeleteModal"));
+  _mxDelModal.show();
+}
+
+document.getElementById("mx-del-confirm-btn").addEventListener("click", () => {
+  if (!_mxDelId) return;
+  const id = _mxDelId;
+  _mxDelId = null;
+  _mxDelModal.hide();
+  fetch(`/inventory/api/items/${id}`, { method: "DELETE" })
+    .then(r => r.json())
+    .then(d => {
+      if (d.status === "ok") {
+        const row = document.getElementById(`mx-inv-row-${id}`);
+        if (row) row.remove();
+        /* If table is now empty, refresh the widget */
+        const tbody = document.querySelector("#mx-inv-widget tbody");
+        if (tbody && !tbody.querySelector("tr")) renderInventory([]);
+      }
+    })
+    .catch(() => window.location.reload());
+});
+
+/* ── Add to inventory ──────────────────────────────────────────────────── */
+document.getElementById("mx-add-inv-btn").addEventListener("click", () => {
+  const num = parseInt(document.getElementById("mx-f-containers").value) || 1;
+  const notes    = document.getElementById("mx-f-notes").value.trim();
+  const location = document.getElementById("mx-f-location").value;
+
+  fetch(`/mixtures/api/${MIX_ID}/inventory`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({num_containers: num, notes: notes || null, location}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    const msg = document.getElementById("mx-add-msg");
+    if (data.status === "ok") {
+      msg.textContent = "Added to inventory!";
+      msg.className   = "alert alert-success py-2 small mb-3";
+      msg.style.display = "";
+      /* Reload card to refresh inventory widget */
+      setTimeout(() => location.reload ? window.location.reload() : null, 1200);
+    } else {
+      msg.textContent   = data.message || "Error.";
+      msg.className     = "alert alert-danger py-2 small mb-3";
+      msg.style.display = "";
+    }
+  })
+  .catch(() => {
+    const msg = document.getElementById("mx-add-msg");
+    msg.textContent   = "Network error.";
+    msg.className     = "alert alert-danger py-2 small mb-3";
+    msg.style.display = "";
+  });
+});
+
+/* ── Add to label cart ─────────────────────────────────────────────────── */
+document.getElementById("add-label-btn").addEventListener("click", () => {
+  if (!mixtureData) return;
+  const fmt  = document.getElementById("label-format-select").value;
+  const vol  = mixtureData.total_volume_L != null
+    ? `${(mixtureData.total_volume_L * 1000).toFixed(1)} mL` : "";
+
+  fetch("/labels/api/cart", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      mixture_id:    MIX_ID,
+      format_size:   fmt,
+      copies:        1,
+      is_prepared:   true,
+      qty_display:   vol,
+      purity_display: "",
+    }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === "ok") {
+      const badge = document.getElementById("cart-badge");
+      if (badge) {
+        badge.textContent  = data.cart_count;
+        badge.style.display = "inline";
+      }
+      const btn = document.getElementById("add-label-btn");
+      btn.classList.add("btn-success");
+      btn.classList.remove("btn-outline-secondary");
+      btn.innerHTML = `<i class="bi bi-check-lg me-1"></i>Added!`;
+      setTimeout(() => {
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-outline-secondary");
+        btn.innerHTML = `<i class="bi bi-tag me-1"></i>Add to Label Cart`;
+      }, 2000);
+    }
+  })
+  .catch(() => {});
+});
+
+/* ── Edit note ─────────────────────────────────────────────────────────── */
+function mxEditNote(itemId, cell) {
+  const current = cell.querySelector("span").textContent.trim().replace(/\s*$/, "");
+  const note = prompt("Edit note:", current);
+  if (note === null) return;   // cancelled
+  fetch(`/inventory/api/items/${itemId}`, {
+    method:  "PATCH",
+    headers: {"Content-Type": "application/json"},
+    body:    JSON.stringify({notes: note || null}),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.status === "ok") {
+      const span = cell.querySelector("span");
+      span.innerHTML = esc(note || "") +
+        `<i class="bi bi-pencil ms-1 opacity-25" style="font-size:0.7rem;"></i>`;
+    }
+  });
+}
+
+/* ── Utility ───────────────────────────────────────────────────────────── */
+function esc(s) {
+  if (!s) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+</script>
+{% endblock %}

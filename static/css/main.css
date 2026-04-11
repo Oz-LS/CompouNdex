@@ -1,0 +1,302 @@
+/* ── Global ──────────────────────────────────────────────────────────────── */
+body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 0.9rem;
+  background-color: #f5f5f5;
+  color: #212529;
+}
+
+/* ── Navbar ──────────────────────────────────────────────────────────────── */
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 1rem;
+}
+.brand-pre {
+  position: relative;
+  top: -3px;
+}
+.brand-post {
+  position: relative;
+  top: 3px;
+}
+.brand-element-nd {
+  display: inline-block;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  padding: 0 3px;
+  margin: 0 1px;
+  line-height: 1.1;
+  font-weight: 800;
+  font-size: 0.95em;
+  background: rgba(255,255,255,0.12);
+}
+.navbar .nav-link {
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+.navbar .nav-link.active {
+  font-weight: 600;
+  border-bottom: 2px solid rgba(255,255,255,0.7);
+}
+
+/* ── Page scaffold ───────────────────────────────────────────────────────── */
+.page-content {
+  padding-top: 1.75rem;
+  padding-bottom: 3rem;
+}
+
+/* ── Section label (small grey uppercase) ────────────────────────────────── */
+.section-title {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6c757d;
+  margin-bottom: 0.6rem;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+.card-header {
+  background-color: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0.55rem 1rem;
+}
+
+/* ── Monospace spans (CAS, formula) ─────────────────────────────────────── */
+.text-mono {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.85em;
+}
+
+/* ── IUPAC formula on reagent card (larger, absolute size) ───────────────── */
+#rc-formula {
+  font-size: 1.05rem;
+  font-family: "Courier New", Courier, monospace;
+  letter-spacing: 0.02em;
+}
+
+/* ── Search page ─────────────────────────────────────────────────────────── */
+.search-card {
+  transition: box-shadow 0.15s;
+}
+.search-card:focus-within {
+  box-shadow: 0 0 0 3px rgba(13,110,253,0.15) !important;
+}
+
+/* ── Autocomplete dropdown ───────────────────────────────────────────────── */
+#name-autocomplete {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  background: #fff;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+#name-autocomplete .list-group-item {
+  cursor: pointer;
+  border-left: none;
+  border-right: none;
+  padding: 0.4rem 0.75rem;
+}
+#name-autocomplete .list-group-item:first-child { border-top: none; }
+#name-autocomplete .list-group-item:hover { background-color: #f0f4ff; }
+
+/* ── Search result card ──────────────────────────────────────────────────── */
+.result-card {
+  border-left: 3px solid #0d6efd;
+}
+
+/* ── Reagent card ────────────────────────────────────────────────────────── */
+.pictogram-img {
+  width: 54px;
+  height: 54px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 2px;
+  background: #fff;
+}
+.signal-danger { color: #dc3545; font-weight: 700; font-size: 0.9rem; }
+.signal-warn   { color: #e07000; font-weight: 700; font-size: 0.9rem; }
+
+.phrase-code {
+  display: inline-block;
+  min-width: 3.5em;
+  font-weight: 600;
+  color: #495057;
+}
+#rc-h-phrases li,
+#rc-p-phrases li {
+  padding: 0.15rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  line-height: 1.4;
+}
+#rc-h-phrases li:last-child,
+#rc-p-phrases li:last-child { border-bottom: none; }
+
+/* ── Inventory "Already in" widget ───────────────────────────────────────── */
+.inv-table td, .inv-table th {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+}
+.inv-loc-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* ── Add-to-inventory form ───────────────────────────────────────────────── */
+.field-error   { border-color: #dc3545 !important; }
+.field-error-msg {
+  display: block;
+  color: #dc3545;
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+/* ── Success alert (inventory add) ──────────────────────────────────────── */
+#add-inv-msg {
+  font-size: 0.82rem;
+  border-left: 3px solid #198754;
+}
+
+/* ── SDS section ─────────────────────────────────────────────────────────── */
+.sds-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.83rem;
+}
+.sds-row:last-child { border-bottom: none; }
+
+/* ── Inventory page table ────────────────────────────────────────────────── */
+.inventory-table th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+.inventory-table td { font-size: 0.85rem; vertical-align: middle; }
+.inventory-table tr:hover td { background-color: #f8f8ff; }
+
+/* ── Label cart ──────────────────────────────────────────────────────────── */
+.label-cart-badge {
+  font-size: 0.62rem;
+  vertical-align: middle;
+}
+
+/* ── Loading spinner overlay ─────────────────────────────────────────────── */
+.spinner-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+/* ── dl key/value pairs ─────────────────────────────────────────────────── */
+dt { color: #6c757d; font-weight: 500; }
+dd { color: #212529; }
+
+/* ── Utility: subtle divider ─────────────────────────────────────────────── */
+.divider-sm {
+  border: none;
+  border-top: 1px solid #ececec;
+  margin: 0.75rem 0;
+}
+
+/* ── Dark mode overrides ─────────────────────────────────────────────────── */
+[data-bs-theme="dark"] body {
+  background-color: #1a1d21;
+  color: #dee2e6;
+}
+[data-bs-theme="dark"] .card {
+  border-color: #444;
+}
+[data-bs-theme="dark"] .card-header {
+  background-color: #2b2f33;
+  border-bottom-color: #444;
+}
+[data-bs-theme="dark"] .section-title {
+  color: #9ea7b0;
+}
+[data-bs-theme="dark"] #name-autocomplete {
+  background: #2b2f33;
+  border-color: #555;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+[data-bs-theme="dark"] #name-autocomplete .list-group-item:hover {
+  background-color: #343a40;
+}
+[data-bs-theme="dark"] .result-card {
+  border-left-color: #4d8bff;
+}
+[data-bs-theme="dark"] .pictogram-img {
+  border-color: #555;
+  background: #2b2f33;
+}
+[data-bs-theme="dark"] .phrase-code {
+  color: #b0b8c0;
+}
+[data-bs-theme="dark"] #rc-h-phrases li,
+[data-bs-theme="dark"] #rc-p-phrases li {
+  border-bottom-color: #3a3a3a;
+}
+[data-bs-theme="dark"] .inventory-table th {
+  color: #9ea7b0;
+  background-color: #2b2f33;
+  border-bottom-color: #555;
+}
+[data-bs-theme="dark"] .inventory-table td { color: #dee2e6; }
+[data-bs-theme="dark"] .inventory-table tr:hover td {
+  background-color: #2a2e33;
+}
+[data-bs-theme="dark"] dt { color: #9ea7b0; }
+[data-bs-theme="dark"] dd { color: #dee2e6; }
+[data-bs-theme="dark"] .divider-sm {
+  border-top-color: #3a3a3a;
+}
+[data-bs-theme="dark"] .sds-row {
+  border-bottom-color: #3a3a3a;
+}
+[data-bs-theme="dark"] .search-card:focus-within {
+  box-shadow: 0 0 0 3px rgba(77,139,255,0.25) !important;
+}
+[data-bs-theme="dark"] #add-inv-msg {
+  border-left-color: #25a06a;
+}
+[data-bs-theme="dark"] .field-error-msg {
+  color: #f08090;
+}
+
+/* Label cart: PDF preview iframe */
+[data-bs-theme="dark"] #pdf-preview-frame {
+  border-color: #444 !important;
+}
+
+/* Reagent card: related-forms separator */
+[data-bs-theme="dark"] .inv-table td[style*="background:#f8f8f8"] {
+  background: #2b2f33 !important;
+  color: #777 !important;
+}
+
+/* Homepage brand element (light mode) */
+.brand-element-nd-home {
+  border-color: #212529;
+  background: rgba(0,0,0,0.06);
+}
+[data-bs-theme="dark"] .brand-element-nd-home {
+  border-color: #dee2e6;
+  background: rgba(255,255,255,0.10);
+}

@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Label Cart{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <h1 class="h5 mb-0 fw-normal text-muted">Label Cart</h1>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-danger btn-sm" id="clear-btn">
+      <i class="bi bi-trash me-1"></i>Clear cart
+    </button>
+    <button class="btn btn-primary btn-sm" id="generate-btn">
+      <i class="bi bi-file-earmark-pdf me-1"></i>Generate PDF
+    </button>
+  </div>
+</div>
+
+<div id="empty-msg" class="text-center text-muted py-5" style="display:none;">
+  <i class="bi bi-tag fs-1 d-block mb-3 opacity-25"></i>
+  <p class="fw-semibold mb-1">No labels in the cart</p>
+  <p class="small">Add labels from a reagent card using the
+    <em>Add to Label Cart</em> button.</p>
+</div>
+
+<div id="cart-wrapper">
+  <table class="table table-sm align-middle inventory-table">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="chk-all" title="Select all"/></th>
+        <th>Reagent</th>
+        <th>CAS</th>
+        <th style="width:140px;">Format</th>
+        <th style="width:75px;">Copies</th>
+        <th style="width:120px;">Type</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="cart-tbody"></tbody>
+  </table>
+
+  <div class="d-flex justify-content-end gap-2 mt-1">
+    <span class="text-muted small align-self-center" id="sel-count"></span>
+    <button class="btn btn-primary btn-sm" id="generate-sel-btn" disabled>
+      <i class="bi bi-file-earmark-pdf me-1"></i>Generate selected
+    </button>
+  </div>
+</div>
+
+<div id="gen-spinner" class="text-center py-3 text-muted" style="display:none;">
+  <div class="spinner-border spinner-border-sm me-2"></div>
+  Generating PDF…
+</div>
+
+<div id="pdf-preview-container" style="display:none;" class="mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="fw-semibold small">PDF Preview</span>
+    <button class="btn btn-primary btn-sm" id="download-preview-btn">
+      <i class="bi bi-download me-1"></i>Download PDF
+    </button>
+  </div>
+  <iframe id="pdf-preview-frame" style="width:100%; height:600px; border:1px solid #dee2e6; border-radius:6px;"></iframe>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const FORMATS = ["1kg","500g","100g","20g","1g"];
+
+function loadCart() {
+  fetch("/labels/api/cart")
+    .then(r => r.json())
+    .then(d => render(d.cart || []));
+}
+
+function render(cart) {
+  const empty   = document.getElementById("empty-msg");
+  const wrapper = document.getElementById("cart-wrapper");
+  const badge   = document.getElementById("cart-badge");
+
+  if (!cart.length) {
+    empty.style.display   = "block";
+    wrapper.style.display = "none";
+    badge.style.display   = "none";
+    return;
+  }
+  empty.style.display   = "none";
+  wrapper.style.display = "block";
+  badge.textContent     = cart.length;
+  badge.style.display   = "inline";
+
+  const tbody = document.getElementById("cart-tbody");
+  tbody.innerHTML = cart.map(e => `
+    <tr id="row-${e.entry_id}">
+      <td><input type="checkbox" class="row-chk" data-id="${e.entry_id}"/></td>
+      <td class="fw-semibold">${e.display_name}</td>
+      <td class="text-mono text-muted small">${e.cas_number}</td>
+      <td>
+        <select class="form-select form-select-sm"
+                onchange="patch('${e.entry_id}', {format_size: this.value})">
+          ${FORMATS.map(f =>
+            `<option value="${f}" ${f===e.format_size?"selected":""}>${f}</option>`
+          ).join("")}
+        </select>
+      </td>
+      <td>
+        <input type="number" class="form-control form-control-sm px-1"
+               min="1" value="${e.copies}"
+               style="width:58px;"
+               onchange="patch('${e.entry_id}', {copies: parseInt(this.value)||1})"/>
+      </td>
+      <td>
+        <select class="form-select form-select-sm"
+                onchange="patch('${e.entry_id}', {is_prepared: this.value==='prepared'})">
+          <option value="reagent"  ${!e.is_prepared?"selected":""}>Reagent</option>
+          <option value="prepared" ${e.is_prepared?"selected":""}>Prepared</option>
+        </select>
+      </td>
+      <td>
+        <button class="btn btn-link btn-sm text-danger p-0"
+                onclick="remove('${e.entry_id}')">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </td>
+    </tr>`).join("");
+
+  // checkbox logic
+  document.querySelectorAll(".row-chk").forEach(chk => {
+    chk.addEventListener("change", updateSelCount);
+  });
+  document.getElementById("chk-all").addEventListener("change", function() {
+    document.querySelectorAll(".row-chk")
+      .forEach(c => { c.checked = this.checked; });
+    updateSelCount();
+  });
+  updateSelCount();
+}
+
+function updateSelCount() {
+  const sel   = [...document.querySelectorAll(".row-chk:checked")];
+  const n     = sel.length;
+  const btn   = document.getElementById("generate-sel-btn");
+  const label = document.getElementById("sel-count");
+  btn.disabled= n === 0;
+  label.textContent = n > 0 ? `${n} selected` : "";
+}
+
+function patch(entryId, data) {
+  fetch(`/labels/api/cart/${entryId}`, {
+    method:"PATCH",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(data),
+  }).then(() => loadCart());
+}
+
+function remove(entryId) {
+  fetch(`/labels/api/cart/${entryId}`, {method:"DELETE"})
+    .then(() => loadCart());
+}
+
+document.getElementById("clear-btn").addEventListener("click", () => {
+  if (!confirm("Clear all labels from the cart?")) return;
+  fetch("/labels/api/cart/clear", {method:"POST"}).then(() => loadCart());
+});
+
+// ── Generate PDF ─────────────────────────────────────────────────────────────
+let _pdfBlobUrl = null;
+
+function generatePdf(entryIds) {
+  const spinner   = document.getElementById("gen-spinner");
+  const preview   = document.getElementById("pdf-preview-container");
+  const iframe    = document.getElementById("pdf-preview-frame");
+
+  spinner.style.display = "block";
+  preview.style.display = "none";
+
+  // Revoke previous blob
+  if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
+
+  const body = entryIds ? {entries: entryIds} : {};
+
+  fetch("/labels/api/generate", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body),
+  })
+  .then(async resp => {
+    spinner.style.display = "none";
+    if (!resp.ok) {
+      const err = await resp.json();
+      alert("PDF error: " + (err.message || resp.statusText));
+      return;
+    }
+    const blob = await resp.blob();
+    _pdfBlobUrl = URL.createObjectURL(blob);
+    iframe.src = _pdfBlobUrl;
+    preview.style.display = "block";
+  })
+  .catch(e => { spinner.style.display="none"; alert("Network error: " + e); });
+}
+
+document.getElementById("download-preview-btn").addEventListener("click", () => {
+  if (!_pdfBlobUrl) return;
+  const a    = document.createElement("a");
+  a.href     = _pdfBlobUrl;
+  a.download = "labels.pdf";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 500);
+});
+
+document.getElementById("generate-btn").addEventListener("click", () => {
+  generatePdf(null);   // all entries
+});
+
+document.getElementById("generate-sel-btn").addEventListener("click", () => {
+  const ids = [...document.querySelectorAll(".row-chk:checked")]
+                .map(c => c.dataset.id);
+  if (ids.length) generatePdf(ids);
+});
+
+loadCart();
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block head_extra %}
+<style>
+  .home-tile {
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.15s, transform 0.15s;
+    border-radius: 10px;
+    min-height: 170px;
+  }
+  .home-tile:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+    transform: translateY(-3px);
+    color: inherit;
+  }
+  .home-tile .tile-icon {
+    font-size: 2.2rem;
+    opacity: 0.7;
+    margin-bottom: 0.5rem;
+  }
+  .home-tile .tile-label {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .home-tile .tile-desc {
+    font-size: 0.82rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+  }
+  [data-bs-theme="dark"] .home-tile:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  }
+  [data-bs-theme="dark"] .home-tile .tile-desc { color: #9ea7b0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4 mt-3">
+  <h1 class="h4 fw-bold">
+    <span class="brand-pre" style="top:-4px;">Compou</span><span class="brand-element-nd brand-element-nd-home">Nd</span><span class="brand-post" style="top:4px;">ex</span>
+  </h1>
+  <p class="text-muted small mb-0">Your Chemical Pokédex</p>
+</div>
+
+<div class="row g-3 justify-content-center" style="max-width:700px; margin:0 auto;">
+  <div class="col-6">
+    <a href="{{ url_for('search.index') }}" class="home-tile card h-100 d-flex align-items-center justify-content-center text-center p-4">
+      <i class="bi bi-search tile-icon text-primary"></i>
+      <span class="tile-label">Search</span>
+      <span class="tile-desc">Find reagents &amp; create special solutions</span>
+    </a>
+  </div>
+  <div class="col-6">
+    <a href="{{ url_for('inventory.index') }}" class="home-tile card h-100 d-flex align-items-center justify-content-center text-center p-4">
+      <i class="bi bi-table tile-icon text-success"></i>
+      <span class="tile-label">Inventory</span>
+      <span class="tile-desc">Browse &amp; manage your stock</span>
+    </a>
+  </div>
+  <div class="col-6">
+    <a href="{{ url_for('labels.index') }}" class="home-tile card h-100 d-flex align-items-center justify-content-center text-center p-4">
+      <i class="bi bi-tag tile-icon text-warning"></i>
+      <span class="tile-label">Label Cart</span>
+      <span class="tile-desc">Generate &amp; print safety labels</span>
+    </a>
+  </div>
+  <div class="col-6">
+    <a href="{{ url_for('guidelines.index') }}" class="home-tile card h-100 d-flex align-items-center justify-content-center text-center p-4">
+      <i class="bi bi-journal-text tile-icon text-info"></i>
+      <span class="tile-label">Guidelines</span>
+      <span class="tile-desc">Safety protocols &amp; references</span>
+    </a>
+  </div>
+</div>
+{% endblock %}

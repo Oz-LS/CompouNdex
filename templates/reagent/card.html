@@ -1,0 +1,982 @@
+{% extends "base.html" %}
+{% block title %}{{ cas }}{% endblock %}
+
+{% block content %}
+
+<!-- ── Loading state ─────────────────────────────────────────────────────── -->
+<div id="rc-loading" class="text-center py-5 text-muted">
+  <div class="spinner-border spinner-border-sm me-2"></div>
+  Loading reagent data&hellip;
+</div>
+
+<!-- ── Error state ───────────────────────────────────────────────────────── -->
+<div id="rc-error" style="display:none;">
+  <div class="alert alert-warning d-flex gap-2 align-items-start">
+    <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+    <div>
+      <strong>Reagent not found.</strong><br>
+      <span class="small" id="rc-error-msg"></span>
+    </div>
+  </div>
+  <a href="{{ url_for('search.index') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Search
+  </a>
+</div>
+
+<!-- ── Main card (hidden until loaded) ───────────────────────────────────── -->
+<div id="rc-main" style="display:none;">
+
+  <!-- Header -->
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1" style="font-size:0.78rem;">
+          <li class="breadcrumb-item">
+            <a href="{{ url_for('search.index') }}" class="text-decoration-none">Search</a>
+          </li>
+          <li class="breadcrumb-item active" id="rc-breadcrumb-name">{{ cas }}</li>
+        </ol>
+      </nav>
+      <h1 class="h4 mb-1" id="rc-display-name">—</h1>
+      <div class="small text-muted" id="rc-subtitle"></div>
+    </div>
+
+    <!-- Label picker -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <select id="label-format-select" class="form-select form-select-sm"
+              style="width:auto;">
+        <option value="1kg">1 kg label</option>
+        <option value="500g">500 g label</option>
+        <option value="100g" selected>100 g label</option>
+        <option value="20g">20 g label</option>
+        <option value="1g">1 g label</option>
+      </select>
+      <button class="btn btn-outline-secondary btn-sm" id="add-label-btn">
+        <i class="bi bi-tag me-1"></i>Add to Label Cart
+      </button>
+    </div>
+  </div><!-- /header -->
+
+  <!-- ══ FULL-WIDTH: Availability ══════════════════════════════════════ -->
+  <div class="card mb-3 shadow-sm" id="availability-card">
+    <div class="card-header">
+      <span class="section-title mb-0">Availability</span>
+    </div>
+    <div id="inv-widget" class="card-body p-0">
+      <div class="text-center text-muted py-3 small">
+        <div class="spinner-border spinner-border-sm me-1"></div>Loading…
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- ══ LEFT COLUMN ══════════════════════════════════════════════════ -->
+    <div class="col-lg-6">
+
+      <!-- Chemical data -->
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header">
+          <span class="section-title mb-0">Chemical Data</span>
+        </div>
+        <div class="card-body py-3">
+          <dl class="row mb-0 small">
+
+            <dt class="col-5">Formula</dt>
+            <dd class="col-7" id="rc-formula">—</dd>
+
+            <dt class="col-5">Molar mass</dt>
+            <dd class="col-7" id="rc-mw">—</dd>
+
+            <dt class="col-5">Appearance</dt>
+            <dd class="col-7" id="rc-appearance" style="white-space:pre-line;">—</dd>
+
+            <dt class="col-5">Melting point</dt>
+            <dd class="col-7" id="rc-mp">—</dd>
+
+            <dt class="col-5" id="rc-dehydration-label" style="display:none;">Dehydration temp.</dt>
+            <dd class="col-7" id="rc-dehydration" style="display:none;">—</dd>
+
+            <dt class="col-5">Boiling point</dt>
+            <dd class="col-7" id="rc-bp">—</dd>
+
+            <dt class="col-5">Solubility</dt>
+            <dd class="col-7" id="rc-solubility" style="white-space:pre-line;">—</dd>
+
+            <dt class="col-5 mb-0" id="rc-synonyms-label" style="display:none;">Synonyms</dt>
+            <dd class="col-7 mb-0" id="rc-synonyms" style="display:none;"></dd>
+
+          </dl>
+        </div>
+      </div>
+
+      <!-- Add to inventory -->
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <span class="section-title mb-0">Add to Inventory</span>
+        </div>
+        <div class="card-body py-3">
+
+          <div id="add-msg" class="alert alert-success py-2 small mb-3"
+               style="display:none;"></div>
+
+          <div class="row g-2">
+
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">
+                Location <span class="text-danger">*</span>
+              </label>
+              <select id="f-location" class="form-select form-select-sm">
+                <option value="">— Select location —</option>
+                <option value="to_buy">To Buy</option>
+                <option value="cabinet_1">Cabinet 1</option>
+                <option value="cabinet_2">Cabinet 2</option>
+                <option value="solvents">Solvents</option>
+                <option value="acids">Acids</option>
+                <option value="bases">Bases</option>
+              </select>
+              <span class="field-error-msg" id="err-location"></span>
+            </div>
+
+            <div class="col-12" id="row-type">
+              <label class="form-label form-label-sm mb-1">
+                Reagent Type <span class="text-danger">*</span>
+              </label>
+              <select id="f-type" class="form-select form-select-sm">
+                <option value="">— Select type —</option>
+                <option value="bought">Bought</option>
+                <option value="borrowed">Borrowed</option>
+                <option value="homemade">Labmade</option>
+              </select>
+            </div>
+
+            <div class="col-7">
+              <label class="form-label form-label-sm mb-1">
+                Quantity <span class="text-danger">*</span>
+              </label>
+              <input type="number" id="f-qty" class="form-control form-control-sm"
+                     min="0" step="0.1" placeholder="0.0" />
+              <span class="field-error-msg" id="err-quantity"></span>
+            </div>
+            <div class="col-5">
+              <label class="form-label form-label-sm mb-1">Unit</label>
+              <select id="f-qty-unit" class="form-select form-select-sm">
+                <option value="g">g</option>
+                <option value="mg">mg</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="L">L</option>
+                <option value="units">units</option>
+              </select>
+            </div>
+
+            <div class="col-7">
+              <label class="form-label form-label-sm mb-1">Concentration</label>
+              <input type="number" id="f-purity" class="form-control form-control-sm"
+                     min="0" step="0.1" placeholder="— if absent" />
+            </div>
+            <div class="col-5">
+              <label class="form-label form-label-sm mb-1">Unit</label>
+              <select id="f-purity-unit" class="form-select form-select-sm">
+                <option value="-">—</option>
+                <option value="%">%</option>
+                <option value="M">M</option>
+                <option value="mM">mM</option>
+                <option value="g/L">g/L</option>
+                <option value="ppm">ppm</option>
+                <option value="ppb">ppb</option>
+              </select>
+            </div>
+
+            <div class="col-5">
+              <label class="form-label form-label-sm mb-1">
+                Containers <span class="text-danger">*</span>
+              </label>
+              <input type="number" id="f-containers"
+                     class="form-control form-control-sm"
+                     min="1" step="1" value="1" />
+              <span class="field-error-msg" id="err-containers"></span>
+            </div>
+
+            <!-- Dynamic fields -->
+            <div class="col-12" id="row-brand" style="display:none;">
+              <label class="form-label form-label-sm mb-1">Brand</label>
+              <select id="f-brand-select" class="form-select form-select-sm"
+                      onchange="toggleBrandOther(this)">
+                <option value="">— Select brand —</option>
+                <option value="Sigma-Aldrich/Merck">Sigma-Aldrich/Merck</option>
+                <option value="Fluka">Fluka</option>
+                <option value="Alfa-Aesar">Alfa-Aesar</option>
+                <option value="Carlo Erba">Carlo Erba</option>
+                <option value="__other__">Other…</option>
+              </select>
+              <input type="text" id="f-brand-other" class="form-control form-control-sm mt-1"
+                     placeholder="Enter brand name…" style="display:none;" />
+              <span class="field-error-msg" id="err-brand"></span>
+            </div>
+            <div class="col-12" id="row-item-code" style="display:none;">
+              <label class="form-label form-label-sm mb-1">Item Code / Link</label>
+              <input type="text" id="f-item-code"
+                     class="form-control form-control-sm" />
+            </div>
+            <div class="col-12" id="row-borrowed-from" style="display:none;">
+              <label class="form-label form-label-sm mb-1">Borrowed from</label>
+              <input type="text" id="f-borrowed-from"
+                     class="form-control form-control-sm" />
+              <span class="field-error-msg" id="err-borrowed-from"></span>
+            </div>
+            <div class="col-12" id="row-prepared-by" style="display:none;">
+              <label class="form-label form-label-sm mb-1">Prepared by</label>
+              <input type="text" id="f-prepared-by"
+                     class="form-control form-control-sm" />
+              <span class="field-error-msg" id="err-prepared-by"></span>
+            </div>
+            <div class="col-12" id="row-event-date" style="display:none;">
+              <label class="form-label form-label-sm mb-1">Date</label>
+              <input type="date" id="f-event-date"
+                     class="form-control form-control-sm" />
+            </div>
+
+            <div class="col-12">
+              <label class="form-label form-label-sm mb-1">Notes</label>
+              <textarea id="f-notes" class="form-control form-control-sm"
+                        rows="2" placeholder="Optional…"></textarea>
+            </div>
+
+            <div class="col-12 pt-1">
+              <button class="btn btn-primary btn-sm px-4" id="add-inv-btn">
+                <i class="bi bi-plus-lg me-1"></i>Add to Inventory
+              </button>
+            </div>
+
+          </div><!-- /row -->
+        </div><!-- /card-body -->
+      </div><!-- /card -->
+
+    </div><!-- /left -->
+
+    <!-- ══ RIGHT COLUMN ══════════════════════════════════════════════════ -->
+    <div class="col-lg-6">
+
+      <!-- Safety -->
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="section-title mb-0">Safety (GHS/CLP)</span>
+          <span id="rc-signal-word" class="fw-semibold" style="font-size:0.85rem;"></span>
+        </div>
+        <div class="card-body py-3">
+
+          <div id="rc-pictograms" class="d-flex flex-wrap gap-2 mb-3"></div>
+
+          <div id="rc-no-hazard" style="display:none;">
+            <span class="text-muted small">
+              <i class="bi bi-check-circle me-1 text-success"></i>
+              No GHS hazard classification found for this compound.
+            </span>
+          </div>
+
+          <div id="rc-hazard-data">
+            <p class="section-title" style="font-size:0.7rem; margin-bottom:0.3rem;">
+              Hazard Statements (H)
+            </p>
+            <ul id="rc-h-phrases" class="list-unstyled small mb-3"></ul>
+
+            <p class="section-title" style="font-size:0.7rem; margin-bottom:0.3rem;">
+              Precautionary Statements (P)
+            </p>
+            <ul id="rc-p-phrases" class="list-unstyled small mb-2"></ul>
+          </div>
+
+          <hr class="divider-sm">
+          <p class="section-title mb-2" style="font-size:0.7rem;">Supplier SDS / Product Pages</p>
+          <div id="rc-supplier-links" class="d-flex flex-wrap gap-1"></div>
+        </div>
+      </div>
+
+      <!-- SDS -->
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <span class="section-title mb-0">Safety Data Sheet (SDS)</span>
+        </div>
+        <div class="card-body py-3">
+          <div id="sds-list" class="mb-3"></div>
+          <hr class="divider-sm">
+          <p class="section-title mb-2">Attach SDS manually</p>
+          <div class="mb-2">
+            <input type="url" id="sds-url-input" class="form-control form-control-sm"
+                   placeholder="Direct URL to SDS PDF…" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label form-label-sm mb-1">or upload a file:</label>
+            <input type="file" id="sds-file-input"
+                   class="form-control form-control-sm" accept=".pdf" />
+          </div>
+          <input type="text" id="sds-supplier-input"
+                 class="form-control form-control-sm mb-2"
+                 placeholder="Supplier (optional)" />
+          <button class="btn btn-sm btn-outline-primary" id="sds-save-btn">
+            <i class="bi bi-upload me-1"></i>Save
+          </button>
+          <span id="sds-msg" class="ms-2 small"></span>
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /row -->
+</div><!-- /rc-main -->
+
+<!-- ── Delete confirmation modal ────────────────────────────────────────── -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">Remove inventory entry?</h6>
+        <button type="button" class="btn-close btn-close-sm"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body small">
+        Setting containers to 0 will permanently remove this inventory entry.
+        Are you sure?
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-secondary"
+                data-bs-dismiss="modal" id="delete-cancel-btn">Cancel</button>
+        <button type="button" class="btn btn-sm btn-danger"
+                id="delete-confirm-btn">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Duplicate inventory modal ───────────────────────────────────────── -->
+<div class="modal fade" id="duplicateModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title mb-0">Duplicate entry found</h6>
+        <button type="button" class="btn-close btn-close-sm"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body small" id="dup-modal-body"></div>
+      <div class="modal-footer py-2 d-flex justify-content-between">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                id="dup-keep-separate-btn">
+          <i class="bi bi-plus-lg me-1"></i>Keep separate
+        </button>
+        <button type="button" class="btn btn-sm btn-primary"
+                id="dup-merge-btn">
+          <i class="bi bi-arrows-collapse me-1"></i>Merge containers
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CAS = "{{ cas }}";
+let reagentId    = null;
+let pendingDelId = null;
+let deleteModal  = null;
+let _dupModal    = null;
+let _dupExisting = null;
+let _dupPayload  = null;
+
+/* ── Boot ─────────────────────────────────────────────────────────────── */
+fetch(`/reagent/api/${CAS}`)
+  .then(r => r.json())
+  .then(data => {
+    if (data.status !== "ok") {
+      document.getElementById("rc-loading").style.display = "none";
+      document.getElementById("rc-error-msg").textContent =
+        data.message || "Could not load reagent data.";
+      document.getElementById("rc-error").style.display = "block";
+      return;
+    }
+    populate(data.reagent);
+    loadInventory();
+    document.getElementById("rc-loading").style.display = "none";
+    document.getElementById("rc-main").style.display    = "block";
+  })
+  .catch(() => {
+    document.getElementById("rc-loading").innerHTML =
+      `<div class="alert alert-danger">Network error — could not load reagent data.</div>`;
+  });
+
+/* ── Populate card ────────────────────────────────────────────────────── */
+function populate(r) {
+  reagentId = r.id;
+
+  // Header
+  document.getElementById("rc-display-name").textContent =
+    r.display_name || r.cas_number;
+  document.getElementById("rc-breadcrumb-name").textContent =
+    r.display_name || r.cas_number;
+
+  const SEP = "&ensp;·&ensp;";
+  const nn  = r.name_notations || {};
+  const notationParts = [];
+  if (nn.traditional && nn.traditional !== r.display_name)
+    notationParts.push(
+      `<span class="text-secondary">Traditional:</span> ${nn.traditional}`);
+  if (nn.iupac && nn.iupac !== r.display_name)
+    notationParts.push(
+      `<span class="text-secondary">IUPAC:</span> ${nn.iupac}`);
+  const idParts = [];
+  if (r.cas_number) idParts.push(`CAS&nbsp;${r.cas_number}`);
+  if (r.ec_number)  idParts.push(`EC&nbsp;${r.ec_number}`);
+  const subtitleLines = [];
+  if (notationParts.length) subtitleLines.push(notationParts.join(SEP));
+  if (idParts.length)       subtitleLines.push(idParts.join(SEP));
+  document.getElementById("rc-subtitle").innerHTML =
+    subtitleLines.join("<br>");
+
+  // Chemical data — show classic formula first; fall back to stored formula.
+  // Always append Hill formula in brackets when it differs from the primary.
+  const classicF = r.molecular_formula_classic;
+  const hillF    = r.molecular_formula_hill;
+  const primaryF = classicF || r.molecular_formula;
+  if (primaryF) {
+    const formulaLabel = (hillF && hillF !== primaryF)
+      ? `${primaryF} (${hillF})`
+      : primaryF;
+    setText("rc-formula", formulaLabel);
+  }
+
+  setText("rc-mw", r.molecular_weight != null
+    ? `${r.molecular_weight.toFixed(3)} g/mol` : null);
+
+  // Appearance: show full text without truncation
+  setText("rc-appearance", r.appearance);
+
+  setText("rc-mp",       r.melting_point);
+  setText("rc-bp",       r.boiling_point);
+  setText("rc-solubility", r.solubility);
+
+  // Dehydration temperature (hydrates only)
+  if (r.is_hydrate && r.dehydration_temp) {
+    setText("rc-dehydration", r.dehydration_temp);
+    document.getElementById("rc-dehydration-label").style.display = "";
+    document.getElementById("rc-dehydration").style.display       = "";
+  }
+
+  // Synonyms (up to 15 entries)
+  const syns = r.synonyms || [];
+  if (syns.length) {
+    const synEl = document.getElementById("rc-synonyms");
+    synEl.innerHTML = syns.map(s =>
+      `<span class="badge bg-light text-secondary border me-1 mb-1"
+             style="font-size:0.72rem; font-weight:400;">${s}</span>`
+    ).join("");
+    document.getElementById("rc-synonyms-label").style.display = "";
+    synEl.style.display = "";
+  }
+
+  // Signal word
+  if (r.signal_word) {
+    const sw = document.getElementById("rc-signal-word");
+    sw.textContent  = r.signal_word;
+    sw.className    = r.signal_word === "Danger" ? "signal-danger" : "signal-warn";
+  }
+
+  // Pictograms
+  const picEl = document.getElementById("rc-pictograms");
+  (r.pictogram_codes || []).forEach(code => {
+    const img    = document.createElement("img");
+    img.src      = `/static/pictograms/${code}.png`;
+    img.alt      = code;
+    img.title    = code;
+    img.className= "pictogram-img";
+    img.onerror  = function () { this.style.display = "none"; };
+    picEl.appendChild(img);
+  });
+
+  const hasHazard = (r.h_codes || []).length > 0;
+  document.getElementById("rc-no-hazard").style.display =
+    hasHazard ? "none" : "block";
+  document.getElementById("rc-hazard-data").style.display =
+    hasHazard ? "block" : "none";
+
+  renderPhrases("rc-h-phrases", r.h_phrases || []);
+  renderPhrases("rc-p-phrases", r.p_phrases || []);
+
+  renderSupplierLinks(r.cas_number);
+  renderSds(r.sds_documents || []);
+}
+
+function renderSupplierLinks(cas) {
+  if (!cas) return;
+  const enc = encodeURIComponent(cas);
+  const suppliers = [
+    {
+      name: "Sigma-Aldrich",
+      url:  `https://www.sigmaaldrich.com/catalog/search?term=${enc}&interface=CAS%20No.&lang=en&region=IT`,
+      sds:  `https://www.sigmaaldrich.com/safety-center`,
+    },
+    {
+      name: "Fisher Scientific",
+      url:  `https://www.fishersci.it/search/products?query=${enc}`,
+      sds:  `https://www.fishersci.it/search/products?query=${enc}`,
+    },
+    {
+      name: "Alfa Aesar",
+      url:  `https://www.alfa.com/en/catalog/search/?q=${enc}`,
+      sds:  `https://www.alfa.com/en/catalog/search/?q=${enc}`,
+    },
+    {
+      name: "VWR",
+      url:  `https://it.vwr.com/store/search?query=${enc}`,
+      sds:  `https://it.vwr.com/store/search?query=${enc}`,
+    },
+    {
+      name: "TCI",
+      url:  `https://www.tcichemicals.com/IT/en/search/?q=${enc}`,
+      sds:  `https://www.tcichemicals.com/IT/en/search/?q=${enc}`,
+    },
+  ];
+  const el = document.getElementById("rc-supplier-links");
+  el.innerHTML = suppliers.map(s =>
+    `<a href="${s.url}" target="_blank" rel="noopener"
+        class="btn btn-outline-secondary btn-sm"
+        style="font-size:0.75rem; padding:0.15rem 0.5rem;">
+       <i class="bi bi-box-arrow-up-right me-1" style="font-size:0.65rem;"></i>${s.name}
+     </a>`
+  ).join("");
+}
+
+function setText(id, value) {
+  document.getElementById(id).textContent = value || "—";
+}
+
+function renderPhrases(listId, phrases) {
+  const ul = document.getElementById(listId);
+  if (!phrases.length) {
+    ul.innerHTML = `<li class="text-muted small">None listed.</li>`;
+    return;
+  }
+  ul.innerHTML = phrases.map(p =>
+    `<li>
+       <span class="phrase-code">${p.code || ""}</span>
+       <span class="text-muted">${p.text || ""}</span>
+     </li>`
+  ).join("");
+}
+
+/* ── SDS ──────────────────────────────────────────────────────────────── */
+function renderSds(docs) {
+  const el = document.getElementById("sds-list");
+  if (!docs.length) {
+    el.innerHTML =
+      `<p class="small text-muted mb-0">No SDS on file. Attach one below.</p>`;
+    return;
+  }
+  el.innerHTML = docs.map(d => `
+    <div class="sds-row">
+      <span class="badge ${d.is_primary ? "bg-primary" : "bg-secondary"} flex-shrink-0">
+        ${d.is_primary ? "Primary" : "Alt"}
+      </span>
+      ${(d.is_local && d.source === 'upload')
+        ? `<a href="/static/${d.file_path}" target="_blank" class="small text-decoration-none">
+             <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>Local copy</a>`
+        : d.original_url
+          ? `<a href="${d.original_url}" target="_blank"
+                class="small text-decoration-none text-truncate">
+               <i class="bi bi-box-arrow-up-right me-1"></i>${d.display_source}</a>`
+          : ``
+      }
+      ${d.supplier ? `<span class="text-muted small ms-auto">${d.supplier}</span>` : ""}
+    </div>`).join("");
+}
+
+document.getElementById("sds-save-btn").addEventListener("click", () => {
+  const form = new FormData();
+  const file = document.getElementById("sds-file-input").files[0];
+  const url  = document.getElementById("sds-url-input").value.trim();
+  const supp = document.getElementById("sds-supplier-input").value.trim();
+  if (file) form.append("file", file);
+  if (url)  form.append("url", url);
+  if (supp) form.append("supplier", supp);
+  if (!file && !url) {
+    setSdsMsg("Provide a URL or select a file.", "danger"); return;
+  }
+  fetch(`/reagent/api/${CAS}/sds`, { method: "POST", body: form })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === "ok") {
+        setSdsMsg("SDS saved.", "success");
+        renderSds([data.document]);
+        document.getElementById("sds-url-input").value  = "";
+        document.getElementById("sds-file-input").value = "";
+      } else {
+        setSdsMsg(data.message || "Error saving SDS.", "danger");
+      }
+    });
+});
+
+function setSdsMsg(text, type) {
+  const el = document.getElementById("sds-msg");
+  el.className = `ms-2 small text-${type}`;
+  el.textContent = text;
+  setTimeout(() => { el.textContent = ""; }, 4000);
+}
+
+/* ── Inventory widget ─────────────────────────────────────────────────── */
+function loadInventory() {
+  // Use the related_inventory endpoint — returns exact match + hydrates/anhydrous/siblings
+  fetch(`/reagent/api/${CAS}/related_inventory`)
+    .then(r => r.json())
+    .then(d => {
+      const items = d.items || [];
+      // Exact-match items are used for the label cart qty/purity defaults
+      _lastInventoryItems = items.filter(i => i.is_exact_match);
+      renderInventory(items);
+    });
+}
+
+function renderInventory(items) {
+  const el = document.getElementById("inv-widget");
+  const card = document.getElementById("availability-card");
+  if (!items.length) {
+    el.innerHTML =
+      `<p class="small text-muted px-3 py-3 mb-0">Not currently in inventory.</p>`;
+    return;
+  }
+  // Green tint when items exist
+  card.classList.add("border-success");
+  card.style.borderWidth = "2px";
+  card.querySelector(".card-header").classList.add("bg-success", "bg-opacity-25");
+
+  // Separate exact-match from related
+  const exact   = items.filter(i => i.is_exact_match);
+  const related = items.filter(i => !i.is_exact_match);
+
+  function buildRows(rowItems, editable) {
+    return rowItems.map(i => {
+      const nameCell = i.is_exact_match ? "" :
+        `<td class="small text-muted" style="max-width:100px; white-space:nowrap;
+             overflow:hidden; text-overflow:ellipsis;" title="${i.reagent_name}">
+           <a href="/reagent/${i.reagent_cas}" class="text-decoration-none text-muted"
+              style="font-size:0.75rem;">${i.reagent_name}</a>
+         </td>`;
+      const safeNotes = (i.notes || "").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+      const notesCell = editable ? `
+        <td class="small text-muted fst-italic" style="max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+            title="${safeNotes}">
+          ${i.notes || ""}
+          <button class="btn btn-link btn-sm p-0 text-muted ms-1" title="Edit notes"
+                  data-notes="${safeNotes}"
+                  onclick="editNotes(${i.id}, this.dataset.notes)">
+            <i class="bi bi-pencil" style="font-size:0.7rem;"></i>
+          </button>
+        </td>` : `<td class="small text-muted fst-italic" style="max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+            title="${safeNotes}">${i.notes || ""}</td>`;
+      const editCol = editable ? `
+        <td>
+          <div class="input-group input-group-sm flex-nowrap" style="width:100px;">
+            <button class="btn btn-outline-secondary px-1 py-0" type="button"
+                    onclick="stepContainers(${i.id}, -1, this)">&minus;</button>
+            <input type="text" inputmode="numeric" pattern="[0-9]*"
+                   class="form-control form-control-sm text-center px-0"
+                   style="width:36px; min-width:0;" value="${i.num_containers}"
+                   onchange="onContainerChange(${i.id}, this.value, this)" />
+            <button class="btn btn-outline-secondary px-1 py-0" type="button"
+                    onclick="stepContainers(${i.id}, +1, this)">+</button>
+          </div>
+        </td>
+        <td>
+          <button class="btn btn-link btn-sm p-0 text-danger" title="Delete entry"
+                  onclick="pendingDelId=${i.id}; deleteModal.show();">
+            <i class="bi bi-trash3" style="font-size:0.8rem;"></i>
+          </button>
+        </td>` : `<td colspan="2"></td>`;
+      return `
+        <tr id="inv-row-${i.id}">
+          ${nameCell}
+          <td><span class="badge bg-secondary inv-loc-badge">${i.location_label}</span></td>
+          <td class="small">${i.quantity_display} × ${i.num_containers}</td>
+          <td class="small">${i.purity_display}</td>
+          <td class="small">${i.brand || "—"}</td>
+          ${notesCell}
+          ${editCol}
+        </tr>`;
+    }).join("");
+  }
+
+  let html = `<div class="table-responsive">
+    <table class="table table-sm inv-table mb-0">
+      <thead class="table-light">
+        <tr>
+          ${related.length ? "<th>Form</th>" : ""}
+          <th>Location</th><th>Qty × n</th><th>Concentration</th>
+          <th>Brand</th><th>Notes</th><th style="width:110px;">Containers</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${buildRows(exact, true)}`;
+
+  if (related.length) {
+    html += `
+        <tr><td colspan="7" class="py-1 px-3"
+              style="background:#f8f8f8; font-size:0.72rem; color:#888;
+                     font-weight:600; text-transform:uppercase; letter-spacing:.06em;">
+          Related forms
+        </td></tr>
+        ${buildRows(related, false)}`;
+  }
+
+  html += `</tbody></table></div>`;
+  el.innerHTML = html;
+  deleteModal = new bootstrap.Modal(document.getElementById("deleteModal"));
+}
+
+function stepContainers(id, delta, btn) {
+  const input = btn.closest(".input-group").querySelector("input");
+  const newVal = Math.max(0, (parseInt(input.value) || 0) + delta);
+  input.value = newVal;
+  onContainerChange(id, newVal, input);
+}
+
+function onContainerChange(id, val, input) {
+  const n = parseInt(val);
+  if (isNaN(n) || n < 0) { input.value = 1; return; }
+  if (n === 0) {
+    pendingDelId = id;
+    input.value  = input.defaultValue; // reset display
+    deleteModal.show();
+  } else {
+    patchItem(id, { num_containers: n });
+    input.defaultValue = n;
+  }
+}
+
+document.getElementById("delete-confirm-btn").addEventListener("click", () => {
+  if (!pendingDelId) return;
+  fetch(`/reagent/api/${CAS}/inventory/${pendingDelId}`, { method: "DELETE" })
+    .then(r => r.json())
+    .then(() => { deleteModal.hide(); loadInventory(); })
+    .catch(() => { deleteModal.hide(); alert("Network error — item may not have been deleted."); });
+});
+
+document.getElementById("delete-cancel-btn").addEventListener("click", () => {
+  pendingDelId = null;
+});
+
+function patchItem(id, data) {
+  return fetch(`/reagent/api/${CAS}/inventory/${id}`, {
+    method:  "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(data),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.status !== "ok") console.warn("PATCH failed:", d.message);
+    loadInventory();
+  })
+  .catch(e => console.error("patchItem network error:", e));
+}
+
+function editNotes(id, current) {
+  const notes = prompt("Edit notes:", current);
+  if (notes !== null) patchItem(id, { notes: notes || null });
+}
+
+/* ── Dynamic form fields ──────────────────────────────────────────────── */
+const locSel  = document.getElementById("f-location");
+const typeSel = document.getElementById("f-type");
+
+function syncFields() {
+  const loc  = locSel.value;
+  const type = typeSel.value;
+  const toBuy = loc === "to_buy";
+
+  show("row-type",         !toBuy);
+  show("row-brand",         toBuy || type === "bought");
+  show("row-item-code",     toBuy);
+  show("row-borrowed-from", !toBuy && type === "borrowed");
+  show("row-prepared-by",   !toBuy && type === "homemade");
+  show("row-event-date",    !toBuy && (type === "borrowed" || type === "homemade"));
+}
+
+function show(id, visible) {
+  document.getElementById(id).style.display = visible ? "block" : "none";
+}
+
+function toggleBrandOther(sel) {
+  const other = document.getElementById("f-brand-other");
+  other.style.display = sel.value === "__other__" ? "block" : "none";
+  if (sel.value !== "__other__") other.value = "";
+}
+
+function getBrandValue() {
+  const sel = document.getElementById("f-brand-select");
+  if (sel.value === "__other__") return document.getElementById("f-brand-other").value || null;
+  return sel.value || null;
+}
+
+locSel.addEventListener("change",  syncFields);
+typeSel.addEventListener("change", syncFields);
+
+// Auto-format decimal on blur
+["f-qty", "f-purity"].forEach(id => {
+  document.getElementById(id).addEventListener("blur", function () {
+    if (this.value && !this.value.includes("."))
+      this.value = parseFloat(this.value).toFixed(1);
+  });
+});
+
+/* ── Add to inventory ─────────────────────────────────────────────────── */
+document.getElementById("add-inv-btn").addEventListener("click", () => {
+  clearErrors();
+  document.getElementById("add-msg").style.display = "none";
+
+  const payload = {
+    location:       locSel.value,
+    reagent_type:   typeSel.value || null,
+    quantity:       document.getElementById("f-qty").value,
+    quantity_unit:  document.getElementById("f-qty-unit").value,
+    num_containers: document.getElementById("f-containers").value,
+    purity_value:   document.getElementById("f-purity").value || null,
+    purity_unit:    document.getElementById("f-purity-unit").value,
+    brand:          getBrandValue(),
+    item_code_link: document.getElementById("f-item-code").value || null,
+    borrowed_from:  document.getElementById("f-borrowed-from").value || null,
+    prepared_by:    document.getElementById("f-prepared-by").value || null,
+    event_date:     document.getElementById("f-event-date").value || null,
+    notes:          document.getElementById("f-notes").value || null,
+  };
+
+  addInventoryRequest(payload);
+});
+
+function addInventoryRequest(payload) {
+  fetch(`/reagent/api/${CAS}/inventory`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === "ok") {
+      const msg = document.getElementById("add-msg");
+      msg.textContent    = data.message;
+      msg.style.display  = "block";
+      resetForm();
+      loadInventory();
+      setTimeout(() => { msg.style.display = "none"; }, 8000);
+    } else if (data.status === "duplicate") {
+      _dupExisting = data.existing;
+      _dupPayload  = payload;
+      document.getElementById("dup-modal-body").textContent = data.message;
+      if (!_dupModal) _dupModal = new bootstrap.Modal(document.getElementById("duplicateModal"));
+      _dupModal.show();
+    } else if (data.errors) {
+      const fieldMap = {
+        location: "f-location", quantity: "f-qty",
+        quantity_unit: "f-qty-unit", num_containers: "f-containers",
+        brand: "f-brand-select", borrowed_from: "f-borrowed-from",
+        prepared_by: "f-prepared-by",
+      };
+      Object.entries(data.errors).forEach(([field, msg]) => {
+        const el = document.getElementById(fieldMap[field]);
+        if (el) el.classList.add("field-error");
+        const errEl = document.getElementById(
+          "err-" + field.replace(/_/g, "-")
+        );
+        if (errEl) errEl.textContent = msg;
+      });
+    }
+  })
+  .catch(() => alert("Network error. Please try again."));
+}
+
+function clearErrors() {
+  document.querySelectorAll(".field-error")
+    .forEach(el => el.classList.remove("field-error"));
+  document.querySelectorAll(".field-error-msg")
+    .forEach(el => { el.textContent = ""; });
+}
+
+function resetForm() {
+  [
+    "f-qty", "f-purity", "f-notes", "f-item-code",
+    "f-borrowed-from", "f-prepared-by", "f-event-date", "f-brand-other",
+  ].forEach(id => { document.getElementById(id).value = ""; });
+  document.getElementById("f-brand-select").value = "";
+  document.getElementById("f-brand-other").style.display = "none";
+  locSel.value  = "";
+  typeSel.value = "";
+  document.getElementById("f-containers").value = "1";
+  syncFields();
+  clearErrors();
+}
+
+/* ── Duplicate modal handlers ─────────────────────────────────────────── */
+document.getElementById("dup-merge-btn").addEventListener("click", () => {
+  if (!_dupExisting || !_dupPayload) return;
+  const merged = _dupExisting.num_containers + parseInt(_dupPayload.num_containers);
+  patchItem(_dupExisting.id, { num_containers: merged });
+  const msg = document.getElementById("add-msg");
+  msg.textContent = `Merged: now ${merged} container(s) in existing entry.`;
+  msg.style.display = "block";
+  resetForm();
+  loadInventory();
+  _dupModal.hide();
+  setTimeout(() => { msg.style.display = "none"; }, 8000);
+});
+
+document.getElementById("dup-keep-separate-btn").addEventListener("click", () => {
+  if (!_dupPayload) return;
+  _dupPayload.force_new = true;
+  _dupModal.hide();
+  addInventoryRequest(_dupPayload);
+});
+
+/* ── Add label to cart ────────────────────────────────────────────────── */
+// Tracks the last-loaded inventory items so we can read qty/purity for the label
+let _lastInventoryItems = [];
+
+document.getElementById("add-label-btn").addEventListener("click", () => {
+  if (!reagentId) return;
+  const format = document.getElementById("label-format-select").value;
+
+  // Try to pick qty/purity from the first inventory item (excluding "to_buy")
+  const inLabItem = _lastInventoryItems.find(
+    i => i.location !== "to_buy" && i.quantity_display
+  ) || _lastInventoryItems[0] || null;
+
+  const qtyDisplay    = inLabItem ? inLabItem.quantity_display : "";
+  const purityDisplay = inLabItem ? inLabItem.purity_display  : "";
+  // is_prepared = true for homemade/lab-mix items
+  const isPrepared    = inLabItem
+    ? (inLabItem.reagent_type === "homemade")
+    : false;
+
+  fetch("/labels/api/cart", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reagent_id:     reagentId,
+      format_size:    format,
+      copies:         1,
+      is_prepared:    isPrepared,
+      qty_display:    qtyDisplay,
+      purity_display: purityDisplay,
+    }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === "ok") {
+      const badge        = document.getElementById("cart-badge");
+      badge.textContent  = data.cart_count;
+      badge.style.display= "inline";
+      const btn          = document.getElementById("add-label-btn");
+      const orig         = btn.innerHTML;
+      btn.innerHTML      = `<i class="bi bi-check-lg me-1"></i>Added!`;
+      btn.disabled       = true;
+      setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000);
+    }
+  });
+});
+</script>
+{% endblock %}
