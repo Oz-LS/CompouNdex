@@ -59,13 +59,25 @@ def api_cart_add():
     if fmt not in LABEL_FORMATS:
         return jsonify({"status": "error", "message": "Invalid payload."}), 400
 
+    cart = _get_cart()
+
     if mixture_id:
-        # Mixture label
         from models.mixture import Mixture
         mixture = db.session.get(Mixture, int(mixture_id))
         if not mixture:
             return jsonify({"status": "error", "message": "Mixture not found."}), 404
-        cart  = _get_cart()
+        # Merge if same mixture + format already in cart
+        existing = next(
+            (e for e in cart
+             if e.get("mixture_id") == int(mixture_id)
+             and e["format_size"] == fmt),
+            None,
+        )
+        if existing:
+            existing["copies"] += copies
+            _save_cart(cart)
+            return jsonify({"status": "ok", "entry_id": existing["entry_id"],
+                            "cart_count": len(cart), "merged": True})
         entry = {
             "entry_id":      str(uuid.uuid4()),
             "mixture_id":    int(mixture_id),
@@ -90,7 +102,19 @@ def api_cart_add():
     if not reagent:
         return jsonify({"status": "error", "message": "Reagent not found."}), 404
 
-    cart  = _get_cart()
+    # Merge if same reagent + format already in cart
+    existing = next(
+        (e for e in cart
+         if e.get("reagent_id") == reagent_id
+         and e["format_size"] == fmt),
+        None,
+    )
+    if existing:
+        existing["copies"] += copies
+        _save_cart(cart)
+        return jsonify({"status": "ok", "entry_id": existing["entry_id"],
+                        "cart_count": len(cart), "merged": True})
+
     entry = {
         "entry_id":      str(uuid.uuid4()),
         "reagent_id":    reagent_id,
@@ -107,6 +131,16 @@ def api_cart_add():
     _save_cart(cart)
     return jsonify({"status": "ok", "entry_id": entry["entry_id"],
                     "cart_count": len(cart)})
+
+
+@labels_bp.route("/api/cart/status/<int:item_id>", methods=["GET"])
+def api_cart_status(item_id):
+    """Return cart entries for a specific reagent or mixture."""
+    kind = request.args.get("kind", "reagent")
+    key = "mixture_id" if kind == "mixture" else "reagent_id"
+    cart = _get_cart()
+    entries = [e for e in cart if e.get(key) == item_id]
+    return jsonify({"entries": entries})
 
 
 @labels_bp.route("/api/cart/<entry_id>", methods=["PATCH"])

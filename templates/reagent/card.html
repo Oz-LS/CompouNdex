@@ -51,10 +51,11 @@
         <option value="20g">20 g label</option>
         <option value="1g">1 g label</option>
       </select>
-      <button class="btn btn-outline-secondary btn-sm" id="add-label-btn">
+      <button class="btn btn-primary btn-sm" id="add-label-btn">
         <i class="bi bi-tag me-1"></i>Add to Label Cart
       </button>
     </div>
+    <div id="cart-status" class="mt-1 small" style="display:none;"></div>
   </div><!-- /header -->
 
   <!-- ══ FULL-WIDTH: Availability ══════════════════════════════════════ -->
@@ -503,6 +504,7 @@ function populate(r) {
 
   renderSupplierLinks(r.cas_number);
   renderSds(r.sds_documents || []);
+  refreshCartStatus();
 }
 
 function renderSupplierLinks(cas) {
@@ -936,21 +938,95 @@ document.getElementById("dup-keep-separate-btn").addEventListener("click", () =>
 // Tracks the last-loaded inventory items so we can read qty/purity for the label
 let _lastInventoryItems = [];
 
-document.getElementById("add-label-btn").addEventListener("click", () => {
-  if (!reagentId) return;
-  const format = document.getElementById("label-format-select").value;
-
-  // Try to pick qty/purity from the first inventory item (excluding "to_buy")
+function _getLabelPayload() {
   const inLabItem = _lastInventoryItems.find(
     i => i.location !== "to_buy" && i.quantity_display
   ) || _lastInventoryItems[0] || null;
+  return {
+    qtyDisplay:    inLabItem ? inLabItem.quantity_display : "",
+    purityDisplay: inLabItem ? inLabItem.purity_display  : "",
+    isPrepared:    inLabItem ? (inLabItem.reagent_type === "homemade") : false,
+  };
+}
 
-  const qtyDisplay    = inLabItem ? inLabItem.quantity_display : "";
-  const purityDisplay = inLabItem ? inLabItem.purity_display  : "";
-  // is_prepared = true for homemade/lab-mix items
-  const isPrepared    = inLabItem
-    ? (inLabItem.reagent_type === "homemade")
-    : false;
+/* Refresh the "In cart" status line below the Add button */
+function refreshCartStatus() {
+  if (!reagentId) return;
+  fetch(`/labels/api/cart/status/${reagentId}?kind=reagent`)
+    .then(r => r.json())
+    .then(d => {
+      const box = document.getElementById("cart-status");
+      const entries = d.entries || [];
+      if (!entries.length) { box.style.display = "none"; return; }
+      box.style.display = "";
+      box.innerHTML = '<span class="text-muted me-1">In cart:</span>' +
+        entries.map(e =>
+          `<span class="badge bg-secondary bg-opacity-25 text-body me-1">` +
+          `<button class="btn btn-sm btn-link p-0 text-danger" `+
+          `onclick="cartDecrement('${e.entry_id}')" title="Remove one">`+
+          `<i class="bi bi-dash-circle"></i></button> ` +
+          `${e.copies}&times; ${e.format_size} ` +
+          `<button class="btn btn-sm btn-link p-0 text-success" `+
+          `onclick="cartIncrement('${e.entry_id}','${e.format_size}')" title="Add one">`+
+          `<i class="bi bi-plus-circle"></i></button>` +
+          `</span>`
+        ).join("");
+    });
+}
+
+/* +1 copy: POST to add (merge logic on backend) */
+function cartIncrement(entryId, fmt) {
+  if (!reagentId) return;
+  const p = _getLabelPayload();
+  fetch("/labels/api/cart", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      reagent_id: reagentId, format_size: fmt, copies: 1,
+      is_prepared: p.isPrepared, qty_display: p.qtyDisplay,
+      purity_display: p.purityDisplay,
+    }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === "ok") {
+      document.getElementById("cart-badge").textContent = data.cart_count;
+      document.getElementById("cart-badge").style.display = "inline";
+    }
+    refreshCartStatus();
+  });
+}
+
+/* -1 copy: PATCH copies-1, or DELETE if it would reach 0 */
+function cartDecrement(entryId) {
+  // First get current copies from the status display
+  fetch(`/labels/api/cart/status/${reagentId}?kind=reagent`)
+    .then(r => r.json())
+    .then(d => {
+      const entry = (d.entries || []).find(e => e.entry_id === entryId);
+      if (!entry) return;
+      if (entry.copies <= 1) {
+        // Remove entirely
+        fetch(`/labels/api/cart/${entryId}`, {method:"DELETE"})
+          .then(r => r.json())
+          .then(data => {
+            const badge = document.getElementById("cart-badge");
+            badge.textContent = data.cart_count;
+            badge.style.display = data.cart_count > 0 ? "inline" : "none";
+            refreshCartStatus();
+          });
+      } else {
+        fetch(`/labels/api/cart/${entryId}`, {
+          method:"PATCH", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({copies: entry.copies - 1}),
+        }).then(() => refreshCartStatus());
+      }
+    });
+}
+
+document.getElementById("add-label-btn").addEventListener("click", () => {
+  if (!reagentId) return;
+  const format = document.getElementById("label-format-select").value;
+  const p = _getLabelPayload();
 
   fetch("/labels/api/cart", {
     method:  "POST",
@@ -959,9 +1035,9 @@ document.getElementById("add-label-btn").addEventListener("click", () => {
       reagent_id:     reagentId,
       format_size:    format,
       copies:         1,
-      is_prepared:    isPrepared,
-      qty_display:    qtyDisplay,
-      purity_display: purityDisplay,
+      is_prepared:    p.isPrepared,
+      qty_display:    p.qtyDisplay,
+      purity_display: p.purityDisplay,
     }),
   })
   .then(r => r.json())
@@ -975,6 +1051,7 @@ document.getElementById("add-label-btn").addEventListener("click", () => {
       btn.innerHTML      = `<i class="bi bi-check-lg me-1"></i>Added!`;
       btn.disabled       = true;
       setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000);
+      refreshCartStatus();
     }
   });
 });

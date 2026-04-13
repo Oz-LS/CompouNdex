@@ -50,10 +50,11 @@
         <option value="20g">20 g label</option>
         <option value="1g">1 g label</option>
       </select>
-      <button class="btn btn-outline-secondary btn-sm" id="add-label-btn">
+      <button class="btn btn-primary btn-sm" id="add-label-btn">
         <i class="bi bi-tag me-1"></i>Add to Label Cart
       </button>
     </div>
+    <div id="cart-status" class="mt-1 small" style="display:none;"></div>
   </div><!-- /header -->
 
   <!-- ══ FULL-WIDTH: Availability ══════════════════════════════════════ -->
@@ -257,6 +258,7 @@ fetch(`/mixtures/api/${MIX_ID}`)
     mixtureData = data.result;
     populateCard(mixtureData);
     document.getElementById("mx-main").style.display = "";
+    refreshCartStatus();
   })
   .catch(() => {
     document.getElementById("mx-loading").style.display = "none";
@@ -521,11 +523,83 @@ document.getElementById("mx-add-inv-btn").addEventListener("click", () => {
 });
 
 /* ── Add to label cart ─────────────────────────────────────────────────── */
+function _getMixLabelPayload() {
+  const vol = mixtureData && mixtureData.total_volume_L != null
+    ? `${(mixtureData.total_volume_L * 1000).toFixed(1)} mL` : "";
+  return { qty_display: vol, purity_display: "", is_prepared: true };
+}
+
+/* Refresh the "In cart" status line below the Add button */
+function refreshCartStatus() {
+  fetch(`/labels/api/cart/status/${MIX_ID}?kind=mixture`)
+    .then(r => r.json())
+    .then(d => {
+      const box = document.getElementById("cart-status");
+      const entries = d.entries || [];
+      if (!entries.length) { box.style.display = "none"; return; }
+      box.style.display = "";
+      box.innerHTML = '<span class="text-muted me-1">In cart:</span>' +
+        entries.map(e =>
+          `<span class="badge bg-secondary bg-opacity-25 text-body me-1">` +
+          `<button class="btn btn-sm btn-link p-0 text-danger" `+
+          `onclick="mxCartDecrement('${e.entry_id}')" title="Remove one">`+
+          `<i class="bi bi-dash-circle"></i></button> ` +
+          `${e.copies}&times; ${e.format_size} ` +
+          `<button class="btn btn-sm btn-link p-0 text-success" `+
+          `onclick="mxCartIncrement('${e.entry_id}','${e.format_size}')" title="Add one">`+
+          `<i class="bi bi-plus-circle"></i></button>` +
+          `</span>`
+        ).join("");
+    });
+}
+
+function mxCartIncrement(entryId, fmt) {
+  const p = _getMixLabelPayload();
+  fetch("/labels/api/cart", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      mixture_id: MIX_ID, format_size: fmt, copies: 1,
+      is_prepared: p.is_prepared, qty_display: p.qty_display,
+      purity_display: p.purity_display,
+    }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === "ok") {
+      const badge = document.getElementById("cart-badge");
+      if (badge) { badge.textContent = data.cart_count; badge.style.display = "inline"; }
+    }
+    refreshCartStatus();
+  });
+}
+
+function mxCartDecrement(entryId) {
+  fetch(`/labels/api/cart/status/${MIX_ID}?kind=mixture`)
+    .then(r => r.json())
+    .then(d => {
+      const entry = (d.entries || []).find(e => e.entry_id === entryId);
+      if (!entry) return;
+      if (entry.copies <= 1) {
+        fetch(`/labels/api/cart/${entryId}`, {method:"DELETE"})
+          .then(r => r.json())
+          .then(data => {
+            const badge = document.getElementById("cart-badge");
+            if (badge) { badge.textContent = data.cart_count; badge.style.display = data.cart_count > 0 ? "inline" : "none"; }
+            refreshCartStatus();
+          });
+      } else {
+        fetch(`/labels/api/cart/${entryId}`, {
+          method:"PATCH", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({copies: entry.copies - 1}),
+        }).then(() => refreshCartStatus());
+      }
+    });
+}
+
 document.getElementById("add-label-btn").addEventListener("click", () => {
   if (!mixtureData) return;
-  const fmt  = document.getElementById("label-format-select").value;
-  const vol  = mixtureData.total_volume_L != null
-    ? `${(mixtureData.total_volume_L * 1000).toFixed(1)} mL` : "";
+  const fmt = document.getElementById("label-format-select").value;
+  const p   = _getMixLabelPayload();
 
   fetch("/labels/api/cart", {
     method: "POST",
@@ -534,28 +608,26 @@ document.getElementById("add-label-btn").addEventListener("click", () => {
       mixture_id:    MIX_ID,
       format_size:   fmt,
       copies:        1,
-      is_prepared:   true,
-      qty_display:   vol,
-      purity_display: "",
+      is_prepared:   p.is_prepared,
+      qty_display:   p.qty_display,
+      purity_display: p.purity_display,
     }),
   })
   .then(r => r.json())
   .then(data => {
     if (data.status === "ok") {
       const badge = document.getElementById("cart-badge");
-      if (badge) {
-        badge.textContent  = data.cart_count;
-        badge.style.display = "inline";
-      }
+      if (badge) { badge.textContent = data.cart_count; badge.style.display = "inline"; }
       const btn = document.getElementById("add-label-btn");
       btn.classList.add("btn-success");
-      btn.classList.remove("btn-outline-secondary");
+      btn.classList.remove("btn-primary");
       btn.innerHTML = `<i class="bi bi-check-lg me-1"></i>Added!`;
       setTimeout(() => {
         btn.classList.remove("btn-success");
-        btn.classList.add("btn-outline-secondary");
+        btn.classList.add("btn-primary");
         btn.innerHTML = `<i class="bi bi-tag me-1"></i>Add to Label Cart`;
       }, 2000);
+      refreshCartStatus();
     }
   })
   .catch(() => {});

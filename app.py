@@ -1,5 +1,6 @@
 import os
 from flask import Flask, render_template
+from flask_session import Session
 from config import config_map
 from extensions import db, migrate
 
@@ -18,6 +19,7 @@ def create_app(env: str = None) -> Flask:
     # Initialise extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    Session(app)
 
     # Import models so Flask-Migrate / db.create_all() can detect them
     with app.app_context():

@@ -15,6 +15,9 @@ ENV/
 *.sqlite
 *.sqlite3
 
+# Server-side sessions
+flask_session/
+
 # macOS
 .DS_Store
 **/.DS_Store
@@ -30,8 +33,3 @@ ENV/
 # IDE
 .vscode/
 .idea/
-
-# Uploads (user data, not code)
-static/sds/
-static/pictograms/
-static/guidelines/*.pdf

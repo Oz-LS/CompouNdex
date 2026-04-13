@@ -23,7 +23,10 @@ class Config:
     SDS_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "sds")
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max upload
 
-    # Label cart is session-based (cleared on browser session end)
+    # Server-side sessions (removes ~4 KB cookie limit for label cart)
+    SESSION_TYPE = "filesystem"
+    SESSION_FILE_DIR = os.path.join(BASE_DIR, "flask_session")
+    SESSION_PERMANENT = False
     SESSION_COOKIE_SAMESITE = "Lax"
 
 
