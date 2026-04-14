@@ -35,6 +35,7 @@ class MixtureComponent(db.Model):
     # mol / mmol / µmol / g / mg / µg   for solutes
     # L   / mL   / µL                   for solvents
     is_solvent      = db.Column(db.Boolean, default=False, nullable=False)
+    is_filler       = db.Column(db.Boolean, default=False, nullable=False)
     component_order = db.Column(db.Integer, default=0, nullable=False)
 
     reagent = db.relationship("Reagent")
@@ -46,6 +47,7 @@ class MixtureComponent(db.Model):
             "amount":          self.amount,
             "amount_unit":     self.amount_unit,
             "is_solvent":      self.is_solvent,
+            "is_filler":       self.is_filler,
             "component_order": self.component_order,
         }
 

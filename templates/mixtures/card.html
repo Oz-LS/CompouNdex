@@ -81,7 +81,23 @@
         </div>
         <div class="card-body py-3">
 
-          <p class="section-title mb-2" style="font-size:0.7rem;">Compounds (solutes)</p>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <p class="section-title mb-0" style="font-size:0.7rem;">Compounds (solutes)</p>
+            <div class="d-flex align-items-center gap-1">
+              <label class="small text-muted mb-0" style="font-size:0.72rem;" for="conc-unit-select">Conc. unit:</label>
+              <select id="conc-unit-select" class="form-select form-select-sm py-0"
+                      style="font-size:0.75rem; width:auto; height:24px;">
+                <option value="mM" selected>mM</option>
+                <option value="M">M</option>
+                <option value="g_per_L">g/L</option>
+                <option value="ppm">ppm (mg/L)</option>
+                <option value="ppb">ppb (µg/L)</option>
+                <option value="pct_mv">% m/v</option>
+                <option value="pct_vv">% v/v</option>
+                <option value="pct_mm">% m/m</option>
+              </select>
+            </div>
+          </div>
           <div class="table-responsive mb-3">
             <table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">
               <thead class="table-light">
@@ -89,7 +105,7 @@
                   <th>Name</th>
                   <th>CAS</th>
                   <th>Amount</th>
-                  <th>Concentration</th>
+                  <th id="mx-conc-header">Conc. (mM)</th>
                 </tr>
               </thead>
               <tbody id="mx-components-body">
@@ -116,6 +132,9 @@
 
           <div class="mt-2 small text-muted">
             Total volume: <strong id="mx-total-volume">—</strong>
+            <span id="mx-mixing-disclaimer-total" class="text-warning-emphasis ms-2" style="display:none;">
+              <i class="bi bi-exclamation-triangle me-1"></i>May differ due to mixing effects.
+            </span>
           </div>
 
           <div id="mx-meta" class="mt-3 small text-muted" style="display:none;">
@@ -146,6 +165,8 @@
                 <option value="solvents">Solvents</option>
                 <option value="acids">Acids</option>
                 <option value="bases">Bases</option>
+                <option value="fridge">Fridge</option>
+                <option value="freezer">Freezer</option>
               </select>
             </div>
 
@@ -292,34 +313,47 @@ function populateCard(m) {
   }
 
   /* Components table */
-  const tbody = document.getElementById("mx-components-body");
-  if (!m.components || !m.components.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted fst-italic">No compounds.</td></tr>`;
-  } else {
-    tbody.innerHTML = m.components.map(c => {
-      const conc = c.concentration_mM != null
-        ? `<span class="text-mono">${c.concentration_mM.toFixed(3)} mM</span>` : "—";
-      const cas = c.cas_number
-        ? `<span class="text-mono text-muted small">${esc(c.cas_number)}</span>` : "—";
-      return `<tr>
-        <td>${esc(c.name)}</td>
-        <td>${cas}</td>
-        <td class="text-mono">${c.amount} ${esc(c.amount_unit)}</td>
-        <td>${conc}</td>
-      </tr>`;
-    }).join("");
-  }
+  renderComponents(m, document.getElementById("conc-unit-select").value);
 
   /* Solvents table */
   const sbody = document.getElementById("mx-solvents-body");
   if (!m.solvents || !m.solvents.length) {
     sbody.innerHTML = `<tr><td colspan="3" class="text-muted fst-italic">No solvents.</td></tr>`;
   } else {
-    sbody.innerHTML = m.solvents.map(s => `<tr>
-      <td>${esc(s.name)}</td>
-      <td class="text-mono">${s.amount} ${esc(s.amount_unit)}</td>
-      <td class="text-mono">${s.volume_L != null ? s.volume_L.toFixed(4) : "—"}</td>
-    </tr>`).join("");
+    const disclaimerBadge =
+      `<span class="text-warning-emphasis ms-1" title="May differ due to mixing effects" style="font-size:0.8em;">` +
+      `<i class="bi bi-exclamation-triangle"></i></span>`;
+    sbody.innerHTML = m.solvents.map(s => {
+      const nameBadge = s.is_filler
+        ? `${esc(s.name)} <span class="badge bg-info bg-opacity-25 text-info-emphasis ms-1" style="font-size:0.65rem;">filler</span>`
+        : esc(s.name);
+      let amountCol;
+      if (s.is_filler && s.target_total_volume_mL != null) {
+        amountCol = `<span class="text-mono">to ${s.target_total_volume_mL} mL total</span>`;
+      } else {
+        amountCol = `<span class="text-mono">${s.amount} ${esc(s.amount_unit)}</span>`;
+      }
+      let volCol;
+      if (s.is_filler && s.filler_volume_mL != null) {
+        volCol = `<span class="text-mono">~${s.filler_volume_mL.toFixed(2)} mL</span>`;
+        if (m.mixing_disclaimer_on_filler) volCol += disclaimerBadge;
+      } else if (s.volume_L != null) {
+        volCol = `<span class="text-mono">${(s.volume_L * 1000).toFixed(2)} mL</span>`;
+      } else {
+        volCol = "—";
+      }
+      return `<tr>
+        <td>${nameBadge}</td>
+        <td>${amountCol}</td>
+        <td>${volCol}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  /* Disclaimer on total volume (no-filler, 2+ liquid sources) */
+  const totalDisclEl = document.getElementById("mx-mixing-disclaimer-total");
+  if (totalDisclEl) {
+    totalDisclEl.style.display = m.mixing_disclaimer_on_total ? "" : "none";
   }
 
   /* Safety */
@@ -363,6 +397,47 @@ function populateCard(m) {
   /* Inventory widget */
   renderInventory(m.inventory_items || []);
 }
+
+/* ── Concentration unit selector ───────────────────────────────────────── */
+const _concUnitLabels = {
+  mM:      { header: "Conc. (mM)",      key: "concentration_mM",      fmt: v => v.toPrecision(4) + " mM"    },
+  M:       { header: "Conc. (M)",       key: "concentration_M",       fmt: v => v.toPrecision(4) + " M"     },
+  g_per_L: { header: "Conc. (g/L)",     key: "concentration_g_per_L", fmt: v => v.toPrecision(4) + " g/L"   },
+  ppm:     { header: "Conc. (ppm)",     key: "concentration_ppm",     fmt: v => v.toPrecision(4) + " ppm"   },
+  ppb:     { header: "Conc. (ppb)",     key: "concentration_ppb",     fmt: v => v.toPrecision(4) + " ppb"   },
+  pct_mv:  { header: "Conc. (% m/v)",   key: "concentration_pct_mv",  fmt: v => v.toPrecision(4) + " % m/v" },
+  pct_vv:  { header: "Conc. (% v/v)",   key: "concentration_pct_vv",  fmt: v => v.toPrecision(4) + " % v/v" },
+  pct_mm:  { header: "Conc. (% m/m)",   key: "concentration_pct_mm",  fmt: v => v.toPrecision(4) + " % m/m" },
+};
+
+function renderComponents(m, unitKey) {
+  const def   = _concUnitLabels[unitKey] || _concUnitLabels["mM"];
+  document.getElementById("mx-conc-header").textContent = def.header;
+
+  const tbody = document.getElementById("mx-components-body");
+  if (!m.components || !m.components.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted fst-italic">No compounds.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = m.components.map(c => {
+    const val  = c[def.key];
+    const conc = (val != null)
+      ? `<span class="text-mono">${def.fmt(val)}</span>`
+      : `<span class="text-muted">—</span>`;
+    const cas = c.cas_number
+      ? `<span class="text-mono text-muted small">${esc(c.cas_number)}</span>` : "—";
+    return `<tr>
+      <td>${esc(c.name)}</td>
+      <td>${cas}</td>
+      <td class="text-mono">${c.amount} ${esc(c.amount_unit)}</td>
+      <td>${conc}</td>
+    </tr>`;
+  }).join("");
+}
+
+document.getElementById("conc-unit-select").addEventListener("change", function () {
+  if (mixtureData) renderComponents(mixtureData, this.value);
+});
 
 let _mxDelId    = null;
 let _mxDelModal = null;

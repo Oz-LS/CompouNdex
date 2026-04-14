@@ -128,6 +128,56 @@
             <i class="bi bi-plus-lg me-1"></i>Add solvent
           </button>
 
+          <!-- ③b Total Solution Volume (filler) -->
+          <div id="mix-filler-section" class="border rounded p-3 mb-3"
+               style="display:none; background:var(--bs-tertiary-bg);">
+            <p class="section-title mb-1" style="font-size:0.75rem;">
+              Total Solution Volume
+              <span class="badge bg-secondary bg-opacity-50 ms-1"
+                    style="font-size:0.6rem;">optional</span>
+            </p>
+            <p class="text-muted small mb-2">
+              Select a solvent to act as <strong>filler</strong>: it will be
+              added in the amount needed to reach the specified total volume.
+            </p>
+            <div class="d-flex align-items-center gap-1 flex-wrap">
+              <span class="small text-muted text-nowrap">Fill with</span>
+              <select class="form-select form-select-sm" id="filler-search-type"
+                      style="max-width:80px;" title="Search by…">
+                <option value="auto">Auto</option>
+                <option value="name">Name</option>
+                <option value="formula">Formula</option>
+                <option value="cas">CAS/EC</option>
+              </select>
+              <input type="text" class="form-control form-control-sm"
+                     id="filler-search-input" placeholder="Filler solvent…"
+                     autocomplete="off" style="min-width:120px;" />
+              <span class="small text-muted text-nowrap">to reach</span>
+              <input type="number" class="form-control form-control-sm"
+                     id="filler-amount" min="0" step="any"
+                     placeholder="Total vol." style="max-width:100px;" />
+              <select class="form-select form-select-sm" id="filler-unit"
+                      style="max-width:75px;">
+                <option value="L">L</option>
+                <option value="mL" selected>mL</option>
+                <option value="µL">µL</option>
+              </select>
+              <button type="button" class="btn btn-outline-danger btn-sm"
+                      id="filler-remove-btn" title="Remove filler">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div id="filler-status" class="mt-1" style="font-size:0.75rem;"></div>
+            <div id="filler-preview" class="mt-2 small fst-italic"
+                 style="display:none;"></div>
+          </div>
+
+          <button type="button"
+                  class="btn btn-outline-info btn-sm mb-3"
+                  id="mix-add-filler">
+            <i class="bi bi-plus-lg me-1"></i>Add filler solvent (total volume)
+          </button>
+
           <!-- ④ Submit -->
           <div class="pt-1">
             <button type="button" class="btn btn-primary btn-sm px-4"
@@ -461,7 +511,7 @@ function makeMixRow(kind) {
   const idx   = mixRowIdx++;
   const units = kind === "solvent"
     ? ["L", "mL", "µL"]
-    : ["mol", "mmol", "µmol", "g", "mg", "µg"];
+    : ["mol", "mmol", "µmol", "g", "mg", "µg", "mL", "µL"];
   const defUnit = kind === "solvent" ? "mL" : "mmol";
 
   const div = document.createElement("div");
@@ -525,6 +575,20 @@ function makeMixRow(kind) {
 const compoundsBox = document.getElementById("mix-compounds-rows");
 const solventsBox  = document.getElementById("mix-solvents-rows");
 
+/* Filler element references — declared here so validateMixture() can use
+   them safely when called from the initial addCompoundRow/addSolventRow. */
+const fillerSection  = document.getElementById("mix-filler-section");
+const fillerAddBtn   = document.getElementById("mix-add-filler");
+const fillerRemBtn   = document.getElementById("filler-remove-btn");
+const fillerInput    = document.getElementById("filler-search-input");
+const fillerAmount   = document.getElementById("filler-amount");
+const fillerUnit     = document.getElementById("filler-unit");
+const fillerStatus   = document.getElementById("filler-status");
+const fillerPreview  = document.getElementById("filler-preview");
+const fillerType     = document.getElementById("filler-search-type");
+let fillerReagentId   = "";
+let fillerResolvedTxt = "";
+
 function addCompoundRow() {
   compoundsBox.appendChild(makeMixRow("compound"));
   validateMixture();
@@ -540,6 +604,211 @@ addSolventRow();
 
 document.getElementById("mix-add-compound").addEventListener("click", addCompoundRow);
 document.getElementById("mix-add-solvent").addEventListener("click",  addSolventRow);
+
+/* ── Filler solvent toggle / resolve / preview ───────────────────────── */
+fillerAddBtn.addEventListener("click", () => {
+  fillerSection.style.display = "";
+  fillerAddBtn.style.display  = "none";
+  validateMixture();
+});
+
+fillerRemBtn.addEventListener("click", () => {
+  fillerSection.style.display = "none";
+  fillerAddBtn.style.display  = "";
+  fillerReagentId   = "";
+  fillerResolvedTxt = "";
+  fillerInput.value  = "";
+  fillerAmount.value = "";
+  fillerStatus.innerHTML  = "";
+  fillerPreview.style.display = "none";
+  validateMixture();
+});
+
+fillerType.addEventListener("change", () => {
+  fillerReagentId   = "";
+  fillerResolvedTxt = "";
+  fillerStatus.innerHTML = "";
+  validateMixture();
+});
+
+fillerInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); resolveFillerInput(); }
+});
+fillerInput.addEventListener("blur", () => resolveFillerInput());
+fillerAmount.addEventListener("input", () => { updateFillerPreview(); validateMixture(); });
+fillerUnit.addEventListener("change",  () => { updateFillerPreview(); validateMixture(); });
+
+let _fillerResolvePromise = null;
+
+function resolveFillerInput() {
+  const q = fillerInput.value.trim();
+  if (!q) {
+    fillerReagentId = "";
+    fillerStatus.innerHTML = "";
+    fillerPreview.style.display = "none";
+    validateMixture();
+    return Promise.resolve();
+  }
+  if (fillerResolvedTxt === q && fillerReagentId) return Promise.resolve();
+  if (_fillerResolvePromise) return _fillerResolvePromise;
+
+  const searchType = fillerType.value;
+  const ep = searchType === "auto" ? guessEndpoint(q) : searchType;
+  fillerStatus.innerHTML =
+    `<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>Searching…</span>`;
+
+  _fillerResolvePromise = fetch(`/search/api/${ep}?q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === "ok") {
+        const r = data.result;
+        fillerReagentId   = r.id || "";
+        fillerResolvedTxt = q;
+        fillerStatus.innerHTML =
+          `<span class="text-success"><i class="bi bi-check-circle me-1"></i>
+           <strong>${escHtml(r.display_name || r.cas_number)}</strong>
+           <span class="text-muted ms-1 text-mono small">${escHtml(r.cas_number)}</span></span>`;
+        updateFillerPreview();
+      } else if (data.status === "ambiguous") {
+        /* Re-use the disambiguation modal, but wire the result to the filler */
+        _pendingDisambigRow = null; // clear normal usage
+        showFillerDisambiguate(data.variants);
+      } else {
+        fillerReagentId   = "";
+        fillerResolvedTxt = "";
+        fillerStatus.innerHTML =
+          `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Not found.</span>`;
+        fillerPreview.style.display = "none";
+      }
+      validateMixture();
+    })
+    .catch(() => {
+      fillerReagentId = "";
+      fillerStatus.innerHTML = `<span class="text-danger">Network error.</span>`;
+      fillerPreview.style.display = "none";
+      validateMixture();
+    })
+    .finally(() => { _fillerResolvePromise = null; });
+
+  return _fillerResolvePromise;
+}
+
+function showFillerDisambiguate(variants) {
+  const list = document.getElementById("disambiguate-list");
+  list.innerHTML = variants.map(v => {
+    const trad = v.traditional_name
+      ? `<div class="small text-muted mt-1">${escHtml(v.traditional_name)}</div>` : "";
+    return `
+    <button type="button"
+       class="list-group-item list-group-item-action px-3 py-2 filler-disambig-btn"
+       data-reagent-id="${v.id || ""}"
+       data-display-name="${escHtml(v.display_name || v.cas_number)}"
+       data-cas="${escHtml(v.cas_number)}">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <span class="fw-semibold">${escHtml(v.display_name || v.cas_number)}</span>
+          ${v.molecular_formula
+            ? `<span class="text-mono text-muted ms-2 small">${escHtml(v.molecular_formula)}</span>`
+            : ""}
+          ${trad}
+        </div>
+        <span class="text-mono text-muted small">${escHtml(v.cas_number)}</span>
+      </div>
+    </button>`;
+  }).join("");
+
+  list.querySelectorAll(".filler-disambig-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rid  = btn.dataset.reagentId;
+      const name = btn.dataset.displayName;
+      const cas  = btn.dataset.cas;
+      bootstrap.Modal.getInstance(document.getElementById("disambiguateModal"))?.hide();
+
+      if (rid) {
+        fillerReagentId   = rid;
+        fillerResolvedTxt = fillerInput.value.trim();
+        fillerStatus.innerHTML =
+          `<span class="text-success"><i class="bi bi-check-circle me-1"></i>
+           <strong>${escHtml(name)}</strong>
+           <span class="text-muted ms-1 text-mono small">${escHtml(cas)}</span></span>`;
+        updateFillerPreview();
+        validateMixture();
+      } else {
+        fillerStatus.innerHTML =
+          `<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>Loading…</span>`;
+        fetch(`/search/api/cas?q=${encodeURIComponent(cas)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.status === "ok") {
+              fillerReagentId   = data.result.id || "";
+              fillerResolvedTxt = fillerInput.value.trim();
+              fillerStatus.innerHTML =
+                `<span class="text-success"><i class="bi bi-check-circle me-1"></i>
+                 <strong>${escHtml(data.result.display_name || cas)}</strong>
+                 <span class="text-muted ms-1 text-mono small">${escHtml(cas)}</span></span>`;
+              updateFillerPreview();
+            } else {
+              fillerReagentId = "";
+              fillerStatus.innerHTML = `<span class="text-danger">Could not load compound.</span>`;
+              fillerPreview.style.display = "none";
+            }
+            validateMixture();
+          })
+          .catch(() => {
+            fillerReagentId = "";
+            fillerStatus.innerHTML = `<span class="text-danger">Network error.</span>`;
+            fillerPreview.style.display = "none";
+            validateMixture();
+          });
+      }
+    });
+  });
+
+  new bootstrap.Modal(document.getElementById("disambiguateModal")).show();
+}
+
+/* Volume conversion factors (mirror server-side) */
+const _unitToL = { "L": 1.0, "mL": 1e-3, "µL": 1e-6 };
+
+function updateFillerPreview() {
+  const totalVol = parseFloat(fillerAmount.value);
+  const unit     = fillerUnit.value;
+  if (!fillerReagentId || !(totalVol > 0) || !_unitToL[unit]) {
+    fillerPreview.style.display = "none";
+    return;
+  }
+  /* Sum volumes of normal solvents + any volume-unit compounds */
+  const solvRows = [...solventsBox.querySelectorAll(".mix-row")];
+  const compRows = [...compoundsBox.querySelectorAll(".mix-row")];
+  let othersL = 0;
+  for (const r of [...solvRows, ...compRows]) {
+    const amt = parseFloat(r.querySelector(".mix-amount").value);
+    const u   = r.querySelector(".mix-unit").value;
+    if (amt > 0 && _unitToL[u] !== undefined) othersL += amt * _unitToL[u];
+  }
+  const totalL  = totalVol * _unitToL[unit];
+  const fillerL = totalL - othersL;
+
+  fillerPreview.style.display = "";
+  if (fillerL < 0) {
+    fillerPreview.innerHTML =
+      `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>
+       Total volume is less than the sum of other solvents.</span>`;
+  } else {
+    /* Display in the best readable unit */
+    let display;
+    if (fillerL >= 1)        display = `~${(fillerL).toFixed(2)} L`;
+    else if (fillerL >= 1e-3) display = `~${(fillerL * 1e3).toFixed(2)} mL`;
+    else                      display = `~${(fillerL * 1e6).toFixed(2)} µL`;
+    fillerPreview.innerHTML =
+      `<span class="text-info"><i class="bi bi-info-circle me-1"></i>
+       Filler solvent will be added as <strong>${display}</strong> to reach the total.</span>`;
+  }
+}
+
+function isFillerActive() {
+  return fillerSection.style.display !== "none";
+}
 
 /* ── Resolve a single row's search input ─────────────────────────────── */
 /*
@@ -714,10 +983,18 @@ function validateMixture() {
     r.dataset.reagentId &&
     parseFloat(r.querySelector(".mix-amount").value) > 0
   );
-  const solvOk = solvRows.some(r =>
+  const normalSolvOk = solvRows.some(r =>
     r.dataset.reagentId &&
     parseFloat(r.querySelector(".mix-amount").value) > 0
   );
+  /* Filler counts as a valid solvent if it has a resolved reagent + amount */
+  const fillerOk = isFillerActive() &&
+    fillerReagentId &&
+    parseFloat(fillerAmount.value) > 0;
+  const solvOk = normalSolvOk || fillerOk;
+
+  /* Also update filler preview whenever validation runs */
+  if (isFillerActive()) updateFillerPreview();
 
   document.getElementById("mix-create-btn").disabled = !(nameOk && compOk && solvOk);
 }
@@ -738,8 +1015,13 @@ document.getElementById("mix-create-btn").addEventListener("click", async () => 
   const unresolvedPromises = allRows
     .filter(r => r.querySelector(".mix-search-input").value.trim() && !r.dataset.reagentId)
     .map(r => resolveMixInput(r));
+  /* Resolve filler too if active */
+  if (isFillerActive() && fillerInput.value.trim() && !fillerReagentId) {
+    unresolvedPromises.push(resolveFillerInput());
+  }
   /* Also wait for any already-in-flight resolves */
   const inFlight = Array.from(_pendingResolves.values());
+  if (_fillerResolvePromise) inFlight.push(_fillerResolvePromise);
   await Promise.allSettled([...unresolvedPromises, ...inFlight]);
 
   btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Creating…`;
@@ -758,12 +1040,23 @@ document.getElementById("mix-create-btn").addEventListener("click", async () => 
       }));
   }
 
+  const solvents = collectRows(solventsBox);
+  /* Append filler solvent if active and resolved */
+  if (isFillerActive() && fillerReagentId && parseFloat(fillerAmount.value) > 0) {
+    solvents.push({
+      reagent_id:  parseInt(fillerReagentId),
+      amount:      parseFloat(fillerAmount.value),
+      amount_unit: fillerUnit.value,
+      is_filler:   true,
+    });
+  }
+
   const payload = {
     name,
     description: description || null,
     author:      author      || null,
     components:  collectRows(compoundsBox),
-    solvents:    collectRows(solventsBox),
+    solvents,
   };
 
   fetch("/mixtures/api/create", {

@@ -11,6 +11,8 @@ LOCATIONS = [
     ("solvents",  "Solvents"),
     ("acids",     "Acids"),
     ("bases",     "Bases"),
+    ("fridge",    "Fridge"),
+    ("freezer",   "Freezer"),
 ]
 
 REAGENT_TYPES = [
