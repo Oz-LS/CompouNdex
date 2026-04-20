@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from extensions import db
 from models import Reagent, InventoryItem
-from services import pubchem_service, chemspider_service, wikidata_service, local_db_service
+from services import pubchem_service, chemspider_service, wikidata_service
 from services.formula_utils import formula_hill_to_iupac
 from services.hydration_service import (
     build_hydrated_name, build_hydrated_formula,
@@ -69,13 +69,6 @@ def search_by_cas(cas: str) -> dict:
     if reagent:
         _supplement_from_wikidata(reagent)
         return {"status": "ok", "result": reagent_to_dict(reagent)}
-
-    # Tier-0: user's own starting database (no API call)
-    compound = local_db_service.find_by_cas(cas)
-    if compound:
-        reagent = _build_from_local_db(compound)
-        if reagent:
-            return {"status": "ok", "result": reagent_to_dict(reagent)}
 
     if chemspider_service.is_available():
         reagent = _build_from_chemspider_cas(cas)
@@ -126,13 +119,6 @@ def search_by_name(name: str, hydration: float | None = None) -> dict:
         return {"status": "ambiguous", "variants": all_variants[:10]}
 
     variants = []
-
-    # Tier-0: user's own starting database (no API call)
-    local_compounds = local_db_service.find_by_name(name)
-    for c in local_compounds:
-        r = _build_from_local_db(c)
-        if r:
-            variants.append(_variant_dict_from_reagent(r))
 
     # ChemSpider (primary)
     if not variants and chemspider_service.is_available():
@@ -186,13 +172,6 @@ def search_by_formula(formula: str, hydration: float | None = None) -> dict:
     local = Reagent.query.filter(
         Reagent.molecular_formula.ilike(formula)
     ).limit(10).all()
-
-    # Tier-0: import any formula matches from starting database not yet in Reagent DB
-    if not local:
-        for c in local_db_service.find_by_formula(formula):
-            r = _build_from_local_db(c)
-            if r:
-                local.append(r)
 
     if len(local) == 1:
         r = local[0]
@@ -352,13 +331,7 @@ def _search_by_ec(ec: str) -> dict:
     if reagent:
         _supplement_from_wikidata(reagent)
         return {"status": "ok", "result": reagent_to_dict(reagent)}
-    # 2. Tier-0: user's own starting database (no API call)
-    compound = local_db_service.find_by_ec(ec)
-    if compound:
-        reagent = _build_from_local_db(compound)
-        if reagent:
-            return {"status": "ok", "result": reagent_to_dict(reagent)}
-    # 3. ChemSpider — EC numbers are indexed as external references / synonyms
+    # 2. ChemSpider — EC numbers are indexed as external references / synonyms
     if chemspider_service.is_available():
         csids = chemspider_service.search_by_name(ec, max_results=1)
         if csids:
@@ -575,123 +548,6 @@ def _find_parent_in_db(reagent: Reagent) -> Reagent | None:
 
 
 # ── Local starting-database builder ──────────────────────────────────────────
-
-def _build_from_local_db(compound: dict) -> Reagent | None:
-    """
-    Create and persist a Reagent from a local-DB compound dict without any
-    external API call.  Applies the same normalization pipeline used by the
-    ChemSpider / PubChem builders:
-      - Stock-name normalization via get_stock_name()
-      - Hill → IUPAC-order formula conversion
-      - Hydration auto-detection and parent/child linking
-      - SdsDocument creation if a URL is present
-    """
-    cas = (compound.get("cas") or "").strip() or None
-    if not cas:
-        return None
-
-    existing = Reagent.query.filter_by(cas_number=cas).first()
-    if existing:
-        return existing
-
-    hill          = (compound.get("formula_hill") or "").strip()
-    iupac_formula = formula_hill_to_iupac(hill) or None
-
-    # Name normalization — same pipeline as API builders.
-    # name_traditional in the local DB is often a short lab nickname ("koac",
-    # "triangle") — only use it as a display name when it contains a space
-    # (i.e. it looks like a real multi-word name, not an abbreviation).
-    trad_raw  = (compound.get("name_traditional") or "").strip()
-    iupac_raw = (compound.get("name_iupac") or "").strip()
-    # PubChem IUPAC may use semicolons for multi-component names ("copper;sulfate;…")
-    # Replace them with spaces so the normalizer can tokenise correctly.
-    iupac_clean = iupac_raw.replace(";", " ").strip()
-    trad_is_real = bool(trad_raw and " " in trad_raw)
-    raw_name  = trad_raw.title() if trad_is_real else (iupac_clean.title() if iupac_clean else None)
-
-    stock = get_stock_name(raw_name, hill or None)
-    if not stock and iupac_clean:
-        # Try iupac as a second source (catches "iron(2+)" style names)
-        stock = get_stock_name(iupac_clean.title(), hill or None)
-    if not stock:
-        # Fall back to the pre-computed name_stock from the local DB
-        ns = (compound.get("name_stock") or "").strip()
-        stock = ns.title() if ns else None
-    stock_name = stock or raw_name or iupac_raw or cas
-
-    # traditional_name: the raw lab nickname if it differs from stock and is real
-    traditional_name = (trad_raw.title() if trad_is_real and stock and stock != trad_raw.title()
-                        else None)
-
-    # Solubility: merge water + other-solvents with a newline separator
-    sol_w = (compound.get("solubility_water") or "").strip()
-    sol_s = (compound.get("solubility_solvents") or "").strip()
-    if sol_w and sol_s:
-        solubility = sol_w + "\n" + sol_s
-    else:
-        solubility = sol_w or sol_s or None
-
-    ec       = (compound.get("ec") or "").strip() or None
-    src      = compound.get("_sources") or {}
-    cid_raw  = src.get("pubchem_cid")
-    pub_cid  = str(cid_raw) if cid_raw else None
-
-    # Fetch live GHS data from PubChem — the starting database was generated
-    # with an older extractor that could aggregate codes from multiple company
-    # classifications.  The live call uses the corrected first-block extractor.
-    if cid_raw:
-        safety = pubchem_service.get_safety_data(int(cid_raw))
-    else:
-        safety = {
-            "h_codes":         compound.get("h_phrases") or [],
-            "p_codes":         compound.get("p_phrases") or [],
-            "pictogram_codes": compound.get("pictograms") or [],
-            "signal_word":     (compound.get("signal_word") or "").capitalize() or None,
-        }
-
-    reagent = Reagent(
-        cas_number             = cas,
-        ec_number              = ec,
-        pubchem_cid            = pub_cid,
-        iupac_name             = _clean_iupac(iupac_raw) or None,
-        stock_name             = stock_name,
-        traditional_name       = traditional_name,
-        molecular_formula      = iupac_formula,
-        molecular_formula_hill = hill or None,
-        molecular_weight       = calculate_mw(hill) if hill else None,
-        melting_point          = (compound.get("melting_point_k") or "").strip() or None,
-        boiling_point          = (compound.get("boiling_point_k") or "").strip() or None,
-        dehydration_temp       = (compound.get("dehydration_temp_k") or "").strip() or None,
-        density                = (compound.get("density") or "").strip() or None,
-        solubility             = solubility,
-        appearance             = (compound.get("appearance") or "").strip() or None,
-        h_codes                = safety["h_codes"],
-        p_codes                = safety["p_codes"],
-        pictogram_codes        = safety["pictogram_codes"],
-        signal_word            = safety["signal_word"],
-        is_hydrate             = False,
-    )
-    db.session.add(reagent)
-    db.session.commit()
-
-    # SDS document if a URL was stored in the local DB
-    sds_url = (compound.get("sds_url") or "").strip()
-    if sds_url:
-        from models import SdsDocument
-        sds = SdsDocument(
-            reagent_id   = reagent.id,
-            source       = "local_db",
-            original_url = sds_url,
-            is_primary   = True,
-        )
-        db.session.add(sds)
-        db.session.commit()
-
-    _auto_detect_hydrate(reagent)
-    _try_link_parent(reagent)
-    _try_link_children(reagent)
-    return reagent
-
 
 # ── ChemSpider builders ───────────────────────────────────────────────────────
 
