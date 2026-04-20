@@ -693,6 +693,16 @@ def _build_from_pubchem(cid: int, expected_cas: str | None = None) -> Reagent | 
         wiki     = f_wiki.result()
         safety   = f_safety.result()
 
+    # When a name/formula search returns a CID with no GHS data (e.g. a hydrate
+    # CID that PubChem hasn't annotated), retry with the CAS-canonical CID.
+    if not safety["h_codes"] and not safety["pictogram_codes"]:
+        cas_cid = pubchem_service.get_cid_by_cas(cas)
+        if cas_cid and cas_cid != cid:
+            safety2 = pubchem_service.get_safety_data(cas_cid)
+            if safety2["h_codes"] or safety2["pictogram_codes"]:
+                safety = safety2
+                cid = cas_cid  # store the canonical CID
+
     # Fuse physicochemical properties from available sources (no ChemSpider here)
     phys = fuse_properties({
         "pubchem":  pub_phys,
