@@ -230,92 +230,150 @@ def pick_readable_synonyms(synonyms: list[str], max_n: int = 12) -> list[str]:
 
 # ── GHS / safety ─────────────────────────────────────────────────────────────
 
+_H_RE  = re.compile(r'\b((?:EUH|H)\d{3}(?:[+](?:EUH|H)\d{3})*)\b', re.IGNORECASE)
+_P_RE  = re.compile(r'\b(P\d{3}(?:[+]P\d{3})*)\b',                  re.IGNORECASE)
+_GHS_RE = re.compile(r'(GHS\d+)',                                     re.IGNORECASE)
+
+
 def get_safety_data(cid: int) -> dict:
     empty = {"h_codes": [], "p_codes": [], "pictogram_codes": [], "signal_word": None}
-    # Primary: fetch only the GHS section — data is already scoped, broad text scan is safe.
+
+    # Primary: GHS Classification section — extract only the first source block
+    # to avoid aggregating codes from minority company classifications.
     data = _view(cid, "GHS Classification")
-    result = _extract_safety(data, strict=False) if data else empty.copy()
+    result = _extract_first_ghs_block(data) if data else empty.copy()
+
+    # Fallback: full compound view, strict markup-only extraction.
     if not result["h_codes"] and not result["pictogram_codes"]:
-        # Fallback: full compound data — use strict mode to avoid picking up codes
-        # from unrelated sections (pharmacology, literature, etc.).
         data2 = _view(cid)
         if data2:
-            result2 = _extract_safety(data2, strict=True)
+            result2 = _extract_safety_strict(data2)
             if result2["h_codes"] or result2["pictogram_codes"]:
                 result = result2
+
     return result
 
 
-def _extract_safety(data: dict, strict: bool = False) -> dict:
+def _extract_first_ghs_block(data: dict) -> dict:
+    """
+    Extract safety data from only the FIRST source block inside the
+    'GHS Classification' section of a PUG View response.
+
+    PubChem stores data from multiple companies/registries in the same section.
+    Each block starts with a 'Pictogram(s)' item (or 'Signal' when there are
+    no pictograms).  We stop processing when a second such item appears so we
+    only get the primary/curated classification and avoid minority codes.
+    """
+    h_codes, p_codes = [], []
+    h_seen, p_seen = set(), set()
+    pic_codes: set[str] = set()
+    signal_word: str | None = None
+
+    for sec in _deep_find(data, "GHS Classification"):
+        signal_count = 0
+        pictogram_count = 0
+
+        for info in sec.get("Information", []):
+            name = info.get("Name", "")
+            swm_list = info.get("Value", {}).get("StringWithMarkup", [])
+
+            # Detect start of a new source block — stop before processing it.
+            if name == "Pictogram(s)":
+                pictogram_count += 1
+                if pictogram_count > 1:
+                    break
+            elif name == "Signal":
+                signal_count += 1
+                if signal_count > 1:
+                    break
+
+            if name == "Signal":
+                for swm in swm_list:
+                    s = swm.get("String", "").strip()
+                    if s in ("Danger", "Warning") and signal_word is None:
+                        signal_word = s
+
+            elif name == "Pictogram(s)":
+                for swm in swm_list:
+                    for markup in swm.get("Markup", []):
+                        m = _GHS_RE.search(markup.get("URL", ""))
+                        if m:
+                            pic_codes.add(m.group(1))
+
+            elif name == "GHS Hazard Statements":
+                for swm in swm_list:
+                    for m in _H_RE.finditer(swm.get("String", "")):
+                        c = m.group(1).upper()
+                        if c not in h_seen:
+                            h_seen.add(c)
+                            h_codes.append(c)
+
+            elif name == "Precautionary Statement Codes":
+                for swm in swm_list:
+                    for m in _P_RE.finditer(swm.get("String", "")):
+                        c = m.group(1).upper()
+                        if c not in p_seen:
+                            p_seen.add(c)
+                            p_codes.append(c)
+
+        if h_codes or pic_codes:
+            break
+
     return {
-        "h_codes":         _extract_h_codes(data, strict),
-        "p_codes":         _extract_p_codes(data, strict),
-        "pictogram_codes": _extract_pictograms(data),
-        "signal_word":     _extract_signal_word(data),
+        "h_codes":         h_codes,
+        "p_codes":         p_codes,
+        "pictogram_codes": sorted(pic_codes),
+        "signal_word":     signal_word,
     }
 
 
-_H_STR = re.compile(r'\b((?:EUH|H)\d{3}(?:[+](?:EUH|H)\d{3})*)\b', re.IGNORECASE)
-_H_URL = re.compile(r'/ghs/#(H\d{3})', re.IGNORECASE)
+def _extract_safety_strict(data: dict) -> dict:
+    """Fallback extractor for full compound data — uses markup and URL scan only."""
+    h_codes, p_codes = [], []
+    h_seen, p_seen = set(), set()
 
-def _extract_h_codes(data: dict, strict: bool = False) -> list[str]:
-    codes, seen = [], set()
-    def _add(c):
-        c = c.upper()
-        if c not in seen: seen.add(c); codes.append(c)
     for extra in _markup_extras(data, "GHSHazard"):
-        m = _H_STR.match(extra.strip())
-        if m: _add(m.group(1))
+        m = _H_RE.match(extra.strip())
+        if m:
+            c = m.group(1).upper()
+            if c not in h_seen: h_seen.add(c); h_codes.append(c)
+
     for url in _deep_find_key(data, "URL"):
         if isinstance(url, str):
-            m = _H_URL.search(url)
-            if m: _add(m.group(1))
-    if not strict:
-        # Safe only when data is already scoped to the GHS Classification section.
-        for s in _all_strings_recursive(data):
-            for m in _H_STR.finditer(s): _add(m.group(1))
-    return codes
+            m = re.search(r'/ghs/#((?:EUH|H)\d{3})', url, re.IGNORECASE)
+            if m:
+                c = m.group(1).upper()
+                if c not in h_seen: h_seen.add(c); h_codes.append(c)
+            m = re.search(r'/ghs/#(P\d{3}(?:[+]P\d{3})*)', url, re.IGNORECASE)
+            if m:
+                c = m.group(1).upper()
+                if c not in p_seen: p_seen.add(c); p_codes.append(c)
 
-
-_P_STR = re.compile(r'\b(P\d{3}(?:[+]P\d{3})*)\b', re.IGNORECASE)
-_P_URL = re.compile(r'/ghs/#(P\d{3})', re.IGNORECASE)
-
-def _extract_p_codes(data: dict, strict: bool = False) -> list[str]:
-    codes, seen = [], set()
-    def _add(c):
-        c = c.upper()
-        if c not in seen: seen.add(c); codes.append(c)
     for extra in _markup_extras(data, "GHSPrecautionary"):
-        m = _P_STR.match(extra.strip())
-        if m: _add(m.group(1))
+        m = _P_RE.match(extra.strip())
+        if m:
+            c = m.group(1).upper()
+            if c not in p_seen: p_seen.add(c); p_codes.append(c)
+
+    pic_codes: set[str] = set()
     for url in _deep_find_key(data, "URL"):
         if isinstance(url, str):
-            m = _P_URL.search(url)
-            if m: _add(m.group(1))
-    if not strict:
-        for s in _all_strings_recursive(data):
-            for m in _P_STR.finditer(s): _add(m.group(1))
-    return codes
+            m = _GHS_RE.search(url)
+            if m: pic_codes.add(m.group(1))
 
-
-def _extract_pictograms(data: dict) -> list[str]:
-    codes = set()
-    for extra in _markup_extras(data, "Icon"):
-        if re.match(r'^GHS\d+$', extra): codes.add(extra)
-    for url in _deep_find_key(data, "URL"):
-        if isinstance(url, str):
-            m = re.search(r'(GHS\d+)', url)
-            if m: codes.add(m.group(1))
-    return sorted(codes)
-
-
-def _extract_signal_word(data: dict) -> str | None:
+    signal_word = None
     for sec in _deep_find(data, "Signal"):
         s = _first_string(sec)
-        if s in ("Danger", "Warning"): return s
-    for s in _all_strings_recursive(data):
-        if s.strip() in ("Danger", "Warning"): return s.strip()
-    return None
+        if s in ("Danger", "Warning"):
+            signal_word = s
+            break
+
+    return {
+        "h_codes":         h_codes,
+        "p_codes":         p_codes,
+        "pictogram_codes": sorted(pic_codes),
+        "signal_word":     signal_word,
+    }
 
 
 # ── Experimental physicochemical properties ───────────────────────────────────
