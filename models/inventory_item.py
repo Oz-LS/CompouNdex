@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from sqlalchemy.orm import validates
 from extensions import db
 
 
@@ -33,11 +34,18 @@ class InventoryItem(db.Model):
     brands, preparation dates, etc.).
     """
     __tablename__ = "inventory_items"
+    __table_args__ = (
+        db.CheckConstraint(
+            "(reagent_id IS NOT NULL AND mixture_id IS NULL) OR "
+            "(reagent_id IS NULL AND mixture_id IS NOT NULL)",
+            name="ck_inventory_reagent_xor_mixture",
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
     # ── Foreign keys ──────────────────────────────────────────────────────────
-    # Exactly one of reagent_id / mixture_id must be set.
+    # Exactly one of reagent_id / mixture_id must be set (enforced by CHECK).
     reagent_id = db.Column(
         db.Integer, db.ForeignKey("reagents.id"), nullable=True, index=True
     )
@@ -80,6 +88,14 @@ class InventoryItem(db.Model):
     # ── Relationships ─────────────────────────────────────────────────────────
     reagent = db.relationship("Reagent", back_populates="inventory_items", foreign_keys=[reagent_id])
     # mixture backref is defined on Mixture.inventory_items
+
+    # ── Validation ────────────────────────────────────────────────────────────
+    @validates("reagent_id", "mixture_id")
+    def _validate_exactly_one_parent(self, key, value):
+        other = self.mixture_id if key == "reagent_id" else self.reagent_id
+        if value is not None and other is not None:
+            raise ValueError("InventoryItem cannot reference both a reagent and a mixture.")
+        return value
 
     # ── Helpers ───────────────────────────────────────────────────────────────
     @property

@@ -19,6 +19,9 @@ class Config:
     # External API keys
     CHEMSPIDER_API_KEY = os.environ.get("CHEMSPIDER_API_KEY", "")
 
+    # Outbound HTTP timeout (seconds) — PubChem/ChemSpider/Wikidata calls.
+    EXTERNAL_API_TIMEOUT = float(os.environ.get("EXTERNAL_API_TIMEOUT", "10"))
+
     # File storage
     SDS_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "sds")
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max upload
@@ -29,6 +32,17 @@ class Config:
     SESSION_PERMANENT = False
     SESSION_COOKIE_SAMESITE = "Lax"
 
+    # CSRF — Flask-WTF reads these automatically.
+    WTF_CSRF_TIME_LIMIT = None  # Token valid for the whole session
+
+    # Feature flags
+    RAG_ENABLED = os.environ.get("RAG_ENABLED", "").lower() in ("1", "true", "yes")
+
+    @classmethod
+    def validate(cls) -> None:
+        """Called at app startup; raise on misconfiguration."""
+        return
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -37,6 +51,16 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+
+    @classmethod
+    def validate(cls) -> None:
+        if cls.SECRET_KEY == "change-me-before-production":
+            raise RuntimeError(
+                "SECRET_KEY must be set to a real value in production "
+                "(export SECRET_KEY=... in the environment)."
+            )
 
 
 config_map = {

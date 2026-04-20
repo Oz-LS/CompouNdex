@@ -61,16 +61,46 @@ def _safe_path(filename: str) -> str | None:
     return None
 
 
+_ALLOWED_MD_TAGS = {
+    "a", "abbr", "b", "blockquote", "br", "code", "div", "em", "h1", "h2",
+    "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "ol", "p", "pre", "span",
+    "strong", "sub", "sup", "table", "tbody", "td", "th", "thead", "tr", "ul",
+}
+_ALLOWED_MD_ATTRS = {
+    "a":    ["href", "title", "rel"],
+    "img":  ["src", "alt", "title"],
+    "code": ["class"],
+    "pre":  ["class"],
+    "span": ["class"],
+    "div":  ["class"],
+    "th":   ["align"],
+    "td":   ["align"],
+}
+
+
 def _render_markdown(filepath: str) -> str:
     try:
         import markdown as md_lib
     except ImportError:
         return ("<p class='text-danger'>Python-Markdown not installed. "
                 "Run <code>pip install Markdown</code>.</p>")
+    try:
+        import bleach
+    except ImportError:
+        bleach = None
     with open(filepath, encoding="utf-8") as f:
         text = f.read()
     extensions = ["tables", "fenced_code", "toc", "nl2br", "sane_lists"]
-    return md_lib.markdown(text, extensions=extensions)
+    html = md_lib.markdown(text, extensions=extensions)
+    if bleach is not None:
+        html = bleach.clean(
+            html,
+            tags=_ALLOWED_MD_TAGS,
+            attributes=_ALLOWED_MD_ATTRS,
+            protocols=["http", "https", "mailto"],
+            strip=True,
+        )
+    return html
 
 
 # ── Page ──────────────────────────────────────────────────────────────────────
@@ -126,6 +156,8 @@ def api_documents():
 
 @guidelines_bp.route("/api/ask", methods=["POST"])
 def api_ask():
+    if not current_app.config.get("RAG_ENABLED"):
+        abort(404)
     from services import rag_service
     data     = request.get_json(force=True) or {}
     question = (data.get("question") or "").strip()

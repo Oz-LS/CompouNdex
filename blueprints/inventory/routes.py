@@ -1,4 +1,5 @@
 from flask import render_template, request, jsonify
+from sqlalchemy.orm import contains_eager
 from extensions import db
 from models import InventoryItem, Reagent
 from models.mixture import Mixture
@@ -18,6 +19,10 @@ def index():
         db.session.query(InventoryItem)
         .outerjoin(Reagent, InventoryItem.reagent_id == Reagent.id)
         .outerjoin(Mixture, InventoryItem.mixture_id == Mixture.id)
+        .options(
+            contains_eager(InventoryItem.reagent),
+            contains_eager(InventoryItem.mixture),
+        )
         .order_by(InventoryItem.location, Reagent.stock_name, Mixture.name)
     )
     if location_filter and location_filter != "all":
@@ -55,6 +60,10 @@ def api_list():
         db.session.query(InventoryItem)
         .outerjoin(Reagent, InventoryItem.reagent_id == Reagent.id)
         .outerjoin(Mixture, InventoryItem.mixture_id == Mixture.id)
+        .options(
+            contains_eager(InventoryItem.reagent),
+            contains_eager(InventoryItem.mixture),
+        )
     )
     if location_filter and location_filter != "all":
         query = query.filter(InventoryItem.location == location_filter)
@@ -139,6 +148,10 @@ def export_csv():
         db.session.query(InventoryItem)
         .outerjoin(Reagent, InventoryItem.reagent_id == Reagent.id)
         .outerjoin(Mixture, InventoryItem.mixture_id == Mixture.id)
+        .options(
+            contains_eager(InventoryItem.reagent),
+            contains_eager(InventoryItem.mixture),
+        )
     )
     if location_filter and location_filter != "all":
         query = query.filter(InventoryItem.location == location_filter)

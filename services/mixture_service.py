@@ -211,8 +211,16 @@ def _merge_ghs(
     pics: set[str] = set()
     sig: str | None = None
 
+    reagent_ids = {c.reagent_id for c in components if c.reagent_id}
+    if not reagent_ids:
+        return [], [], [], None
+    reagents = {
+        r.id: r
+        for r in Reagent.query.filter(Reagent.id.in_(reagent_ids)).all()
+    }
+
     for comp in components:
-        r = db.session.get(Reagent, comp.reagent_id)
+        r = reagents.get(comp.reagent_id)
         if not r:
             continue
         h.update(r.h_codes or [])

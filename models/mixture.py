@@ -9,9 +9,13 @@ constituents.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from extensions import db
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class MixtureComponent(db.Model):
@@ -57,15 +61,15 @@ class Mixture(db.Model):
     __tablename__ = "mixtures"
 
     id          = db.Column(db.Integer, primary_key=True)
-    name        = db.Column(db.String(200), nullable=False)
+    name        = db.Column(db.String(200), nullable=False, index=True)
     description = db.Column(db.Text, nullable=True)
     author      = db.Column(db.String(200), nullable=True)
     notes       = db.Column(db.Text, nullable=True)
-    created_at  = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at  = db.Column(db.DateTime, default=_utcnow, nullable=False)
     updated_at  = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_utcnow,
+        onupdate=_utcnow,
         nullable=False,
     )
 
@@ -75,11 +79,13 @@ class Mixture(db.Model):
         cascade="all, delete-orphan",
         order_by="MixtureComponent.component_order",
     )
+    # Inventory is critical lab data; do NOT cascade delete.  Deleting a
+    # mixture that still has inventory items will raise an IntegrityError.
     inventory_items = db.relationship(
         "InventoryItem",
         backref="mixture",
-        cascade="all, delete-orphan",
         foreign_keys="InventoryItem.mixture_id",
+        passive_deletes="all",
     )
 
     @property

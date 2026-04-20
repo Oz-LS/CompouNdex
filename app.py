@@ -1,24 +1,33 @@
 import os
+import logging
+
 from flask import Flask, render_template
 from flask_session import Session
 from config import config_map
-from extensions import db, migrate
+from extensions import db, migrate, csrf
 
 
 def create_app(env: str = None) -> Flask:
     """Application factory. ``env`` selects the Config class to use."""
     env = env or os.environ.get("FLASK_ENV", "default")
+    cfg = config_map[env]
+    cfg.validate()
+
     app = Flask(__name__)
-    app.config.from_object(config_map[env])
+    app.config.from_object(cfg)
+
+    _configure_logging(app)
 
     # Ensure required directories exist
     os.makedirs(app.config["SDS_UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(os.path.join(app.static_folder, "guidelines"), exist_ok=True)
     os.makedirs(os.path.join(app.static_folder, "pictograms"), exist_ok=True)
+    os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
 
     # Initialise extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    csrf.init_app(app)
     Session(app)
 
     # Import models so Flask-Migrate / db.create_all() can detect them
@@ -68,8 +77,18 @@ def create_app(env: str = None) -> Flask:
     return app
 
 
+def _configure_logging(app: Flask) -> None:
+    level = logging.DEBUG if app.config.get("DEBUG") else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+    # Quiet down noisy third-party loggers unless we're debugging.
+    logging.getLogger("werkzeug").setLevel(logging.WARNING if level > logging.DEBUG else logging.INFO)
+
+
 # Module-level app instance for PythonAnywhere WSGI and `flask` CLI
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True)
+    app.run(host="0.0.0.0", debug=app.config.get("DEBUG", False))

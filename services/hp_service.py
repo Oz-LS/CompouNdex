@@ -3,6 +3,8 @@ Local H/P phrase resolver.
 Reads from the bundled hazard_phrases module (data/hazard_phrases.py).
 All lookups are in-memory; no external calls required.
 """
+from __future__ import annotations
+
 import sys
 import os
 

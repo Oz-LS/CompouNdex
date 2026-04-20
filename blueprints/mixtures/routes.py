@@ -86,6 +86,15 @@ def api_delete(mix_id: int):
     mixture = db.session.get(Mixture, mix_id)
     if not mixture:
         return jsonify({"status": "error", "message": "Mixture not found."}), 404
+    if mixture.inventory_items:
+        return jsonify({
+            "status": "error",
+            "message": (
+                f"Cannot delete: mixture still has "
+                f"{len(mixture.inventory_items)} inventory item(s). "
+                "Remove them from inventory first."
+            ),
+        }), 409
     db.session.delete(mixture)
     db.session.commit()
     return jsonify({"status": "ok"})

@@ -16,10 +16,13 @@ Endpoints used:
   GET  /lookups/datasources   — list valid datasource names
 """
 from __future__ import annotations
+import logging
 import re
 import time
 import requests
 from flask import current_app
+
+log = logging.getLogger(__name__)
 
 BASE       = "https://api.rsc.org/compounds/v1"
 TIMEOUT    = 10
@@ -94,18 +97,28 @@ def _post(path: str, body: dict) -> dict | None:
     try:
         r = requests.post(f"{BASE}/{path}", json=body,
                           headers=_headers(), timeout=TIMEOUT)
-        return r.json() if r.status_code == 200 else None
-    except Exception:
-        return None
+        if r.status_code == 200:
+            return r.json()
+        log.info("chemspider POST %s -> HTTP %s", path, r.status_code)
+    except requests.RequestException as e:
+        log.warning("chemspider POST %s failed: %s", path, e)
+    except ValueError as e:
+        log.warning("chemspider POST %s JSON decode failed: %s", path, e)
+    return None
 
 
 def _get(path: str, params: dict = None) -> dict | None:
     try:
         r = requests.get(f"{BASE}/{path}", params=params,
                          headers=_headers(), timeout=TIMEOUT)
-        return r.json() if r.status_code == 200 else None
-    except Exception:
-        return None
+        if r.status_code == 200:
+            return r.json()
+        log.info("chemspider GET %s -> HTTP %s", path, r.status_code)
+    except requests.RequestException as e:
+        log.warning("chemspider GET %s failed: %s", path, e)
+    except ValueError as e:
+        log.warning("chemspider GET %s JSON decode failed: %s", path, e)
+    return None
 
 
 # ── Async filter (shared) ─────────────────────────────────────────────────────

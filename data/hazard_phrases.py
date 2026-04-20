@@ -2,6 +2,7 @@
 Dizionario bilingue IT/EN delle frasi H (pericolo) e P (prudenza) CLP/GHS.
 Fonte: Regolamento (CE) n. 1272/2008 (CLP) e successive modifiche — testi ufficiali.
 """
+from __future__ import annotations
 
 import re
 

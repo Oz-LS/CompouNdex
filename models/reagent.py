@@ -62,11 +62,14 @@ class Reagent(db.Model):
     )
 
     # ── Relationships ─────────────────────────────────────────────────────────
+    # SDS docs are tightly bound to the reagent — cascade OK.
     sds_documents = db.relationship(
         "SdsDocument", back_populates="reagent", cascade="all, delete-orphan"
     )
+    # Inventory is critical lab data; do NOT cascade delete.  Deleting a
+    # reagent that still has inventory items will raise an IntegrityError.
     inventory_items = db.relationship(
-        "InventoryItem", back_populates="reagent", cascade="all, delete-orphan"
+        "InventoryItem", back_populates="reagent", passive_deletes="all"
     )
 
     # ── Helpers ───────────────────────────────────────────────────────────────

@@ -2,9 +2,12 @@
 PubChem PUG REST / PUG View API client.
 """
 from __future__ import annotations
+import logging
 import re
 import time
 import requests
+
+log = logging.getLogger(__name__)
 
 PUG_BASE  = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
 VIEW_BASE = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view"
@@ -26,8 +29,11 @@ def _get(url: str, params: dict = None) -> dict | None:
             time.sleep(3)
             resp = requests.get(url, params=params, timeout=TIMEOUT)
             return resp.json() if resp.status_code == 200 else None
-    except Exception:
-        pass
+        log.info("pubchem %s -> HTTP %s", url, resp.status_code)
+    except requests.RequestException as e:
+        log.warning("pubchem request failed for %s: %s", url, e)
+    except ValueError as e:
+        log.warning("pubchem JSON decode failed for %s: %s", url, e)
     return None
 
 
