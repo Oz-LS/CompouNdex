@@ -232,21 +232,24 @@ def pick_readable_synonyms(synonyms: list[str], max_n: int = 12) -> list[str]:
 
 def get_safety_data(cid: int) -> dict:
     empty = {"h_codes": [], "p_codes": [], "pictogram_codes": [], "signal_word": None}
+    # Primary: fetch only the GHS section — data is already scoped, broad text scan is safe.
     data = _view(cid, "GHS Classification")
-    result = _extract_safety(data) if data else empty.copy()
+    result = _extract_safety(data, strict=False) if data else empty.copy()
     if not result["h_codes"] and not result["pictogram_codes"]:
+        # Fallback: full compound data — use strict mode to avoid picking up codes
+        # from unrelated sections (pharmacology, literature, etc.).
         data2 = _view(cid)
         if data2:
-            result2 = _extract_safety(data2)
+            result2 = _extract_safety(data2, strict=True)
             if result2["h_codes"] or result2["pictogram_codes"]:
                 result = result2
     return result
 
 
-def _extract_safety(data: dict) -> dict:
+def _extract_safety(data: dict, strict: bool = False) -> dict:
     return {
-        "h_codes":         _extract_h_codes(data),
-        "p_codes":         _extract_p_codes(data),
+        "h_codes":         _extract_h_codes(data, strict),
+        "p_codes":         _extract_p_codes(data, strict),
         "pictogram_codes": _extract_pictograms(data),
         "signal_word":     _extract_signal_word(data),
     }
@@ -255,40 +258,43 @@ def _extract_safety(data: dict) -> dict:
 _H_STR = re.compile(r'\b((?:EUH|H)\d{3}(?:[+](?:EUH|H)\d{3})*)\b', re.IGNORECASE)
 _H_URL = re.compile(r'/ghs/#(H\d{3})', re.IGNORECASE)
 
-def _extract_h_codes(data: dict) -> list[str]:
+def _extract_h_codes(data: dict, strict: bool = False) -> list[str]:
     codes, seen = [], set()
     def _add(c):
         c = c.upper()
         if c not in seen: seen.add(c); codes.append(c)
-    for s in _all_strings_recursive(data):
-        for m in _H_STR.finditer(s): _add(m.group(1))
+    for extra in _markup_extras(data, "GHSHazard"):
+        m = _H_STR.match(extra.strip())
+        if m: _add(m.group(1))
     for url in _deep_find_key(data, "URL"):
         if isinstance(url, str):
             m = _H_URL.search(url)
             if m: _add(m.group(1))
-    for extra in _markup_extras(data, "GHSHazard"):
-        m = _H_STR.match(extra.strip())
-        if m: _add(m.group(1))
+    if not strict:
+        # Safe only when data is already scoped to the GHS Classification section.
+        for s in _all_strings_recursive(data):
+            for m in _H_STR.finditer(s): _add(m.group(1))
     return codes
 
 
 _P_STR = re.compile(r'\b(P\d{3}(?:[+]P\d{3})*)\b', re.IGNORECASE)
 _P_URL = re.compile(r'/ghs/#(P\d{3})', re.IGNORECASE)
 
-def _extract_p_codes(data: dict) -> list[str]:
+def _extract_p_codes(data: dict, strict: bool = False) -> list[str]:
     codes, seen = [], set()
     def _add(c):
         c = c.upper()
         if c not in seen: seen.add(c); codes.append(c)
-    for s in _all_strings_recursive(data):
-        for m in _P_STR.finditer(s): _add(m.group(1))
+    for extra in _markup_extras(data, "GHSPrecautionary"):
+        m = _P_STR.match(extra.strip())
+        if m: _add(m.group(1))
     for url in _deep_find_key(data, "URL"):
         if isinstance(url, str):
             m = _P_URL.search(url)
             if m: _add(m.group(1))
-    for extra in _markup_extras(data, "GHSPrecautionary"):
-        m = _P_STR.match(extra.strip())
-        if m: _add(m.group(1))
+    if not strict:
+        for s in _all_strings_recursive(data):
+            for m in _P_STR.finditer(s): _add(m.group(1))
     return codes
 
 
