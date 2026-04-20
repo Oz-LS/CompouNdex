@@ -636,6 +636,19 @@ def _build_from_local_db(compound: dict) -> Reagent | None:
     cid_raw  = src.get("pubchem_cid")
     pub_cid  = str(cid_raw) if cid_raw else None
 
+    # Fetch live GHS data from PubChem — the starting database was generated
+    # with an older extractor that could aggregate codes from multiple company
+    # classifications.  The live call uses the corrected first-block extractor.
+    if cid_raw:
+        safety = pubchem_service.get_safety_data(int(cid_raw))
+    else:
+        safety = {
+            "h_codes":         compound.get("h_phrases") or [],
+            "p_codes":         compound.get("p_phrases") or [],
+            "pictogram_codes": compound.get("pictograms") or [],
+            "signal_word":     (compound.get("signal_word") or "").capitalize() or None,
+        }
+
     reagent = Reagent(
         cas_number             = cas,
         ec_number              = ec,
@@ -652,10 +665,10 @@ def _build_from_local_db(compound: dict) -> Reagent | None:
         density                = (compound.get("density") or "").strip() or None,
         solubility             = solubility,
         appearance             = (compound.get("appearance") or "").strip() or None,
-        h_codes                = compound.get("h_phrases") or [],
-        p_codes                = compound.get("p_phrases") or [],
-        pictogram_codes        = compound.get("pictograms") or [],
-        signal_word            = (compound.get("signal_word") or "").capitalize() or None,
+        h_codes                = safety["h_codes"],
+        p_codes                = safety["p_codes"],
+        pictogram_codes        = safety["pictogram_codes"],
+        signal_word            = safety["signal_word"],
         is_hydrate             = False,
     )
     db.session.add(reagent)
