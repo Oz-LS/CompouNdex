@@ -22,6 +22,7 @@ H_EN = {
     "H224":   "Extremely flammable liquid and vapour.",
     "H225":   "Highly flammable liquid and vapour.",
     "H226":   "Flammable liquid and vapour.",
+    "H227":   "Combustible liquid.",
     "H228":   "Flammable solid.",
     "H229":   "Pressurized container: may burst if heated.",
     "H230":   "May react explosively even in the absence of air.",
@@ -112,6 +113,7 @@ H_IT = {
     "H224":   "Liquido e vapori estremamente infiammabili.",
     "H225":   "Liquido e vapori facilmente infiammabili.",
     "H226":   "Liquido e vapori infiammabili.",
+    "H227":   "Liquido combustibile.",
     "H228":   "Solido infiammabile.",
     "H229":   "Recipiente in pressione: può esplodere se riscaldato.",
     "H230":   "Può esplodere anche in assenza di aria.",
@@ -194,6 +196,7 @@ P_EN = {
     "P103": "Read label before use.",
     "P201": "Obtain special instructions before use.",
     "P202": "Do not handle until all safety precautions have been read and understood.",
+    "P203": "Obtain, read and follow all safety instructions before use.",
     "P210": "Keep away from heat, hot surfaces, sparks, open flames and other ignition sources. No smoking.",
     "P211": "Do not spray on an open flame or other ignition source.",
     "P220": "Keep away from clothing and other combustible materials.",
@@ -216,6 +219,7 @@ P_EN = {
     "P262": "Do not get in eyes, on skin, or on clothing.",
     "P263": "Avoid contact during pregnancy and while nursing.",
     "P264": "Wash hands thoroughly after handling.",
+    "P265": "Do not touch eyes.",
     "P270": "Do not eat, drink or smoke when using this product.",
     "P271": "Use only outdoors or in a well-ventilated area.",
     "P272": "Contaminated work clothing should not be allowed out of the workplace.",
@@ -238,6 +242,10 @@ P_EN = {
     "P313": "Get medical advice/attention.",
     "P314": "Get medical advice/attention if you feel unwell.",
     "P315": "Get immediate medical advice/attention.",
+    "P316": "Get emergency medical help immediately.",
+    "P317": "Get medical help.",
+    "P318": "IF exposed or concerned, get medical advice.",
+    "P319": "Get medical help if you feel unwell.",
     "P320": "Specific treatment is urgent.",
     "P321": "Specific treatment.",
     "P330": "Rinse mouth.",
@@ -255,10 +263,12 @@ P_EN = {
     "P351": "Rinse cautiously with water for several minutes.",
     "P352": "Wash with plenty of water.",
     "P353": "Rinse skin with water or shower.",
+    "P354": "Immediately rinse with water for several minutes.",
     "P360": "Rinse immediately contaminated clothing and skin with plenty of water before removing clothes.",
     "P361": "Take off immediately all contaminated clothing.",
     "P362": "Take off contaminated clothing.",
     "P363": "Wash contaminated clothing before reuse.",
+    "P364": "And wash it before reuse.",
     "P370": "In case of fire:",
     "P371": "In case of major fire and large quantities:",
     "P372": "Explosion risk.",
@@ -267,6 +277,7 @@ P_EN = {
     "P375": "Fight fire remotely due to the risk of explosion.",
     "P376": "Stop leak if safe to do so.",
     "P377": "Leaking gas fire: do not extinguish, unless leak can be stopped safely.",
+    "P378": "Use … to extinguish.",
     "P380": "Evacuate area.",
     "P381": "In case of leakage, eliminate all ignition sources.",
     "P390": "Absorb spillage to prevent material damage.",
@@ -293,6 +304,7 @@ P_IT = {
     "P103": "Leggere l'etichetta prima dell'uso.",
     "P201": "Procurarsi le istruzioni specifiche prima dell'uso.",
     "P202": "Non manipolare prima di aver letto e compreso tutte le precauzioni di sicurezza.",
+    "P203": "Procurarsi, leggere e seguire tutte le istruzioni di sicurezza prima dell'uso.",
     "P210": "Tenere lontano da fonti di calore, superfici calde, scintille, fiamme libere e altre fonti di accensione. Non fumare.",
     "P211": "Non vaporizzare su una fiamma libera o altra fonte di accensione.",
     "P220": "Tenere lontano da indumenti e altri materiali combustibili.",
@@ -315,6 +327,7 @@ P_IT = {
     "P262": "Evitare il contatto con gli occhi, la pelle o gli indumenti.",
     "P263": "Evitare il contatto durante la gravidanza e l'allattamento.",
     "P264": "Lavare accuratamente dopo l'uso.",
+    "P265": "Non toccare gli occhi.",
     "P270": "Non mangiare, né bere, né fumare durante l'uso.",
     "P271": "Utilizzare soltanto all'aperto o in luogo ben ventilato.",
     "P272": "Gli indumenti da lavoro contaminati non devono essere portati fuori dal luogo di lavoro.",
@@ -337,6 +350,10 @@ P_IT = {
     "P313": "Consultare un medico.",
     "P314": "In caso di malessere, consultare un medico.",
     "P315": "Consultare immediatamente un medico.",
+    "P316": "Richiedere immediatamente assistenza medica d'emergenza.",
+    "P317": "Consultare un medico.",
+    "P318": "In caso di esposizione o di possibile esposizione, consultare un medico.",
+    "P319": "Consultare un medico in caso di malessere.",
     "P320": "Trattamento specifico urgente.",
     "P321": "Trattamento specifico.",
     "P330": "Sciacquare la bocca.",
@@ -354,10 +371,12 @@ P_IT = {
     "P351": "Sciacquare accuratamente per parecchi minuti.",
     "P352": "Lavare abbondantemente con acqua.",
     "P353": "Sciacquare la pelle/fare una doccia.",
+    "P354": "Sciacquare immediatamente con acqua per diversi minuti.",
     "P360": "Sciacquare immediatamente e abbondantemente gli indumenti contaminati e la pelle prima di togliersi gli indumenti.",
     "P361": "Togliersi immediatamente di dosso tutti gli indumenti contaminati.",
     "P362": "Togliersi di dosso gli indumenti contaminati.",
     "P363": "Lavare gli indumenti contaminati prima di indossarli nuovamente.",
+    "P364": "E lavarli prima di indossarli nuovamente.",
     "P370": "In caso di incendio:",
     "P371": "In caso di incendio grave e di grandi quantità:",
     "P372": "Rischio di esplosione in caso di incendio.",
@@ -366,6 +385,7 @@ P_IT = {
     "P375": "Rischio di esplosione. Estinguere a distanza.",
     "P376": "Bloccare la perdita se non vi sono rischi.",
     "P377": "In caso di perdita di gas con innesco di incendio: non estinguere se la perdita non può essere bloccata senza pericolo.",
+    "P378": "Utilizzare … per estinguere.",
     "P380": "Evacuare la zona.",
     "P381": "In caso di perdita, eliminare tutte le fonti di accensione.",
     "P390": "Assorbire la fuoriuscita per evitare danni materiali.",
@@ -408,24 +428,31 @@ def translate_phrase(phrase_string: str, lang: str) -> dict:
     if not code:
         return {"code": None, "text": phrase_string}
 
-    if lang == "en":
-        # Usa il testo già incorporato nella stringa PubChem come fallback,
-        # oppure il dizionario EN per uniformità.
-        parts = re.split(r'[+/]', code)
-        texts = [H_EN.get(p) or P_EN.get(p) for p in parts]
-        if all(texts):
-            return {"code": code, "text": " / ".join(t for t in texts if t)}
-        # fallback: testo grezzo di PubChem senza il codice
-        raw = re.sub(r'^(?:EUH|H|P)\d+(?:[+/](?:EUH|H|P)\d+)*\s*', '', phrase_string).strip()
-        return {"code": code, "text": raw or phrase_string}
+    parts = re.split(r'[+/]', code)
+    dict_h, dict_p = (H_EN, P_EN) if lang == "en" else (H_IT, P_IT)
+    texts = [dict_h.get(p) or dict_p.get(p) for p in parts]
 
-    else:  # it
-        parts = re.split(r'[+/]', code)
-        texts_it = [H_IT.get(p) or P_IT.get(p) for p in parts]
-        if all(texts_it):
-            return {"code": code, "text": " / ".join(t for t in texts_it if t)}
-        # fallback inglese
-        return translate_phrase(phrase_string, "en")
+    # All parts translated — join with " / ".
+    if all(texts):
+        return {"code": code, "text": " / ".join(texts)}
+
+    # Partial match: join whatever we have (dropping missing parts).
+    # Better to show "part A text / part C text" than to repeat the code.
+    if any(texts):
+        return {"code": code, "text": " / ".join(t for t in texts if t)}
+
+    # Italian fully missing — try English before giving up.
+    if lang == "it":
+        en = translate_phrase(phrase_string, "en")
+        if en.get("text") and en["text"] != code:
+            return en
+
+    # Nothing usable in either dictionary — fall back to any inline text
+    # PubChem embedded in the phrase string.  If all we have is the bare code,
+    # return an empty text (the renderer will then show just the code, not
+    # duplicate it).
+    raw = re.sub(r'^(?:EUH|H|P)\d+(?:[+/](?:EUH|H|P)\d+)*\s*', '', phrase_string).strip()
+    return {"code": code, "text": raw if raw and raw != phrase_string else ""}
 
 
 def translate_phrases(phrases: list, lang: str) -> list:
